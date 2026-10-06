@@ -31,6 +31,9 @@ Thumbs.db
 # Local data and model artifacts
 data/*
 !data/.gitkeep
+!data/samples/
+data/samples/*
+!data/samples/*.pdf
 backend/data/*
 !backend/data/.gitkeep
 storage/*

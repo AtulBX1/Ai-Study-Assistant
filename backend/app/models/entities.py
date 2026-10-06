@@ -77,13 +77,53 @@ class Document(TimestampMixin, Base):
         ForeignKey("users.id", ondelete="CASCADE"), index=True
     )
     title: Mapped[str] = mapped_column(String(255))
-    status: Mapped[str] = mapped_column(String(32), default="uploaded")
+    status: Mapped[str] = mapped_column(String(32), default="queued")
+    progress: Mapped[int] = mapped_column(Integer, default=0)
+    error_message: Mapped[str | None] = mapped_column(Text)
     page_count: Mapped[int | None] = mapped_column(Integer)
     language: Mapped[str | None] = mapped_column(String(32))
     storage_key: Mapped[str | None] = mapped_column(String(512))
     chunks: Mapped[list["Chunk"]] = relationship(
         back_populates="document", cascade="all, delete-orphan"
     )
+    pages: Mapped[list["DocumentPage"]] = relationship(
+        back_populates="document", cascade="all, delete-orphan"
+    )
+    status_events: Mapped[list["DocumentStatusEvent"]] = relationship(
+        back_populates="document", cascade="all, delete-orphan"
+    )
+
+
+class DocumentStatusEvent(Base):
+    __tablename__ = "document_status_events"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    document_id: Mapped[int] = mapped_column(
+        ForeignKey("documents.id", ondelete="CASCADE"), index=True
+    )
+    status: Mapped[str] = mapped_column(String(32))
+    progress: Mapped[int] = mapped_column(Integer)
+    error_message: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now
+    )
+    document: Mapped[Document] = relationship(back_populates="status_events")
+
+
+class DocumentPage(Base):
+    __tablename__ = "document_pages"
+    __table_args__ = (UniqueConstraint("document_id", "page_number"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    document_id: Mapped[int] = mapped_column(
+        ForeignKey("documents.id", ondelete="CASCADE"), index=True
+    )
+    page_number: Mapped[int] = mapped_column(Integer)
+    text: Mapped[str] = mapped_column(Text, default="")
+    headings: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
+    tables: Mapped[list[list[list[str | None]]]] = mapped_column(JSON, default=list)
+    ocr_status: Mapped[str] = mapped_column(String(32), default="not_needed")
+    document: Mapped[Document] = relationship(back_populates="pages")
 
 
 class Chunk(Base):

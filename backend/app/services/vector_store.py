@@ -35,6 +35,9 @@ class VectorStore(Protocol):
     ) -> list[VectorMatch]:
         """Return the closest vector points."""
 
+    def delete_document(self, document_id: int) -> None:
+        """Remove vector points whose payload belongs to a document."""
+
 
 class QdrantVectorStore:
     """Qdrant adapter usable in embedded-file or remote-server mode."""
@@ -80,6 +83,23 @@ class QdrantVectorStore:
             VectorMatch(id=str(point.id), score=point.score, payload=point.payload)
             for point in results
         ]
+
+    def delete_document(self, document_id: int) -> None:
+        selector = models.FilterSelector(
+            filter=models.Filter(
+                must=[
+                    models.FieldCondition(
+                        key="document_id",
+                        match=models.MatchValue(value=document_id),
+                    )
+                ]
+            )
+        )
+        for collection in self._client.get_collections().collections:
+            self._client.delete(
+                collection_name=collection.name,
+                points_selector=selector,
+            )
 
 
 def create_vector_store(settings: Settings | None = None) -> VectorStore:

@@ -3,6 +3,7 @@
 from functools import lru_cache
 from typing import Literal
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -27,6 +28,9 @@ class Settings(BaseSettings):
     qdrant_url: str | None = None
     qdrant_local_path: str = "./data/qdrant"
     storage_path: str = "../storage"
+    max_pdf_size_bytes: int = Field(default=20 * 1024 * 1024, gt=0)
+    max_pdf_pages: int = Field(default=500, gt=0)
+    page_image_cache_size: int = Field(default=32, gt=0)
     s3_endpoint_url: str | None = None
     s3_region: str = "us-east-1"
     s3_bucket: str = "study-documents"
