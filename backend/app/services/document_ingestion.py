@@ -12,6 +12,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.models import Document, DocumentPage, DocumentStatusEvent
+from app.nlp.preprocessing import normalize_text
 from app.services.file_storage import FileStorage
 
 
@@ -196,6 +197,7 @@ def ingest_document(
                             document_id=document_id,
                             page_number=index,
                             text=text,
+                            cleaned_text=normalize_text(text),
                             headings=page_data["headings"],
                             tables=tables,
                             ocr_status=ocr_status,

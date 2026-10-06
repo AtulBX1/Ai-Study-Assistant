@@ -15,6 +15,7 @@ from sqlalchemy import select
 from app.core.config import Settings, get_settings
 from app.main import app
 from app.models import Document, DocumentPage, DocumentStatusEvent, User
+from app.nlp.preprocessing import normalize_text
 from app.routers.documents import (
     get_document_file_storage,
     get_document_job_queue,
@@ -234,6 +235,7 @@ def test_ingestion_extracts_structured_tables(
     assert page is not None
     assert page.tables
     assert "Module | Pages" in page.text
+    assert page.cleaned_text == normalize_text(page.text)
 
 
 def test_scanned_page_records_clear_marker_when_tesseract_is_unavailable(

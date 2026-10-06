@@ -120,6 +120,7 @@ class DocumentPage(Base):
     )
     page_number: Mapped[int] = mapped_column(Integer)
     text: Mapped[str] = mapped_column(Text, default="")
+    cleaned_text: Mapped[str | None] = mapped_column(Text)
     headings: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
     tables: Mapped[list[list[list[str | None]]]] = mapped_column(JSON, default=list)
     ocr_status: Mapped[str] = mapped_column(String(32), default="not_needed")

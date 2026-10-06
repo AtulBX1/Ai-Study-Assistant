@@ -24,6 +24,7 @@ class DocumentPageResponse(BaseModel):
     document_id: int
     page_number: int
     text: str
+    cleaned_text: str | None
     headings: list[dict[str, str | float | bool]]
     tables: list[list[list[str | None]]]
     ocr_status: str
