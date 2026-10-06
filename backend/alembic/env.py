@@ -1,19 +1,21 @@
-"""Alembic environment; metadata and migrations will be added in a later step."""
+"""Alembic environment for the application SQLAlchemy metadata."""
 
 from logging.config import fileConfig
 from pathlib import Path
 
 from sqlalchemy import engine_from_config, pool
-from sqlalchemy.engine import make_url
 
+import app.models  # noqa: F401
 from alembic import context
 from app.core.config import get_settings
+from app.core.database import Base, normalize_database_url
 
 config = context.config
 database_url = get_settings().database_url
 if database_url is None:
     raise RuntimeError("DATABASE_URL must be set before running Alembic.")
-url = make_url(database_url)
+url = normalize_database_url(database_url)
+database_url = url.render_as_string(hide_password=False)
 if url.get_backend_name() == "sqlite" and url.database not in (
     None,
     "",
@@ -25,7 +27,7 @@ config.set_main_option("sqlalchemy.url", database_url.replace("%", "%%"))
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-target_metadata = None
+target_metadata = Base.metadata
 
 
 def run_migrations_offline() -> None:

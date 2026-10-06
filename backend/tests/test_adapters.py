@@ -12,7 +12,7 @@ from sqlalchemy import create_engine, inspect
 
 from alembic import command
 from app.core.config import Settings, get_settings
-from app.core.database import create_database_engine
+from app.core.database import create_database_engine, normalize_database_url
 from app.services.file_storage import LocalFileStorage
 from app.services.job_queue import LocalJobQueue
 from app.services.vector_store import create_vector_store
@@ -90,6 +90,12 @@ def test_local_database_uses_sqlite_engine(tmp_path: Path) -> None:
 def test_production_rejects_sqlite_database_url() -> None:
     with pytest.raises(ValueError, match="non-SQLite DATABASE_URL"):
         create_database_engine(Settings(backend="prod"))
+
+
+def test_standard_postgresql_url_selects_psycopg3_driver() -> None:
+    url = normalize_database_url("postgresql://localhost/study_assistant")
+
+    assert url.drivername == "postgresql+psycopg"
 
 
 def test_alembic_migrates_sqlite_database(

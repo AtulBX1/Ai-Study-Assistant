@@ -18,6 +18,12 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
     database_url: str = "sqlite:///./data/study_assistant.db"
     redis_url: str = "redis://localhost:6379/0"
+    jwt_secret_key: str = "local-development-key-change-before-deploying"
+    jwt_algorithm: Literal["HS256"] = "HS256"
+    access_token_minutes: int = 15
+    refresh_token_days: int = 7
+    rate_limit_ip_per_minute: int = 120
+    rate_limit_user_per_minute: int = 60
     qdrant_url: str | None = None
     qdrant_local_path: str = "./data/qdrant"
     storage_path: str = "../storage"
@@ -39,6 +45,18 @@ class Settings(BaseSettings):
         """Prevent production configuration from silently using a local database."""
         if self.backend == "prod" and self.database_url.startswith("sqlite"):
             raise ValueError("BACKEND=prod requires a non-SQLite DATABASE_URL.")
+
+    def validate_auth_settings(self) -> None:
+        """Reject unsafe production signing keys and invalid token lifetimes."""
+        if self.backend == "prod" and (
+            len(self.jwt_secret_key) < 32
+            or self.jwt_secret_key == "local-development-key-change-before-deploying"
+        ):
+            raise ValueError(
+                "JWT_SECRET_KEY must be a non-default secret of at least 32 characters."
+            )
+        if self.access_token_minutes <= 0 or self.refresh_token_days <= 0:
+            raise ValueError("JWT token lifetimes must be positive.")
 
     def validate_vector_backend(self) -> None:
         """Require a Qdrant server URL for production vector search."""
