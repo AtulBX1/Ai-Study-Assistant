@@ -7,6 +7,7 @@ stores them with page ranges, section titles, token counts, and stable
 per-document indices. `POST /documents/{id}/rechunk` rebuilds an owned
 document's chunks with caller-selected size and overlap. Authenticated
 `POST /search` supports TF-IDF and BM25 and returns ranked source chunks.
+Step 6 adds document-trained Word2Vec retrieval as a third classical mode.
 Retriever indexes are cached separately for each user and document set; a
 change to chunk content produces a new cache fingerprint.
 

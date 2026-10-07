@@ -12,8 +12,8 @@ from app.retrieval.registry import register_retriever
 class BM25Retriever(Retriever):
     """Rank chunks with BM25 term saturation and document-length normalization."""
 
-    def __init__(self, chunks: Sequence[ChunkRecord]) -> None:
-        super().__init__(chunks)
+    def __init__(self, chunks: Sequence[ChunkRecord], user_id: int = 0) -> None:
+        super().__init__(chunks, user_id)
         self._tokenized = [preprocess_tokens(chunk.text) for chunk in self.chunks]
         self._index = (
             BM25Okapi(self._tokenized)

@@ -9,6 +9,7 @@ dependencies = [
     "boto3>=1.37,<2",
     "celery[redis]>=5.4,<6",
     "fastapi>=0.115,<1",
+    "gensim>=4.3.3,<5",
     "nltk>=3.9,<4",
     "PyJWT>=2.10,<3",
     "psycopg[binary]>=3.2,<4",
@@ -51,3 +52,4 @@ select = ["E", "F", "I", "UP", "B"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = [".", ".."]
+markers = ["slow: downloads or exercises large external embedding data"]

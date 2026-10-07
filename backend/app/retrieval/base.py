@@ -4,13 +4,9 @@ from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-from app.nlp.preprocessing import (
-    detect_language,
-    handle_punctuation,
-    normalize_text,
-    regex_tokenize,
-    remove_stop_words,
-)
+from app.nlp.preprocessing import preprocess_tokens
+
+__all__ = ["ChunkRecord", "RetrievalResult", "Retriever", "preprocess_tokens"]
 
 
 @dataclass(frozen=True)
@@ -44,18 +40,12 @@ class RetrievalResult:
     rank: int
 
 
-def preprocess_tokens(text: str) -> list[str]:
-    """Apply Step 4 normalization, tokenization, punctuation, and stop words."""
-    normalized = normalize_text(text)
-    tokens = handle_punctuation(regex_tokenize(normalized))
-    return remove_stop_words(tokens, detect_language(normalized))
-
-
 class Retriever(ABC):
     """Common interface for ranking chunks from selected documents."""
 
-    def __init__(self, chunks: Sequence[ChunkRecord]) -> None:
+    def __init__(self, chunks: Sequence[ChunkRecord], user_id: int = 0) -> None:
         self.chunks = tuple(chunks)
+        self.user_id = user_id
 
     @abstractmethod
     def score(self, query: str) -> list[float]:

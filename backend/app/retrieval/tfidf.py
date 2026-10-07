@@ -12,8 +12,8 @@ from app.retrieval.registry import register_retriever
 class TfidfRetriever(Retriever):
     """Rank chunks by cosine similarity in a normalized TF-IDF space."""
 
-    def __init__(self, chunks: Sequence[ChunkRecord]) -> None:
-        super().__init__(chunks)
+    def __init__(self, chunks: Sequence[ChunkRecord], user_id: int = 0) -> None:
+        super().__init__(chunks, user_id)
         tokenized = [preprocess_tokens(chunk.text) for chunk in self.chunks]
         self._valid_indexes = [
             index for index, tokens in enumerate(tokenized) if tokens

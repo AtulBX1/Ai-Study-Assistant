@@ -17,8 +17,12 @@ for import_path in (PROJECT_ROOT, BACKEND_ROOT):
         sys.path.insert(0, str(import_path))
 
 from app.models import DocumentPage  # noqa: E402
+from app.nlp.embeddings_classic import train_word2vec  # noqa: E402
 from app.retrieval.base import ChunkRecord  # noqa: E402
-from app.retrieval.registry import get_retriever  # noqa: E402
+from app.retrieval.registry import (  # noqa: E402
+    get_retriever,
+    invalidate_retriever_cache,
+)
 from app.services.chunking import create_chunks  # noqa: E402
 from ml.eval.metrics import (  # noqa: E402
     mean_reciprocal_rank,
@@ -111,6 +115,19 @@ def evaluate(
 ) -> dict[str, float]:
     """Run all labeled questions and return macro-averaged ranking metrics."""
     chunks, document_ids = _load_corpus(questions)
+    if mode == "word2vec":
+        for document_id in document_ids.values():
+            train_word2vec(
+                chunks,
+                user_id=0,
+                document_id=document_id,
+                architecture="cbow",
+                vector_size=100,
+                window=5,
+                min_count=1,
+                epochs=20,
+            )
+            invalidate_retriever_cache("word2vec", 0, document_id)
     retriever = get_retriever(mode, user_id=0, chunks=chunks)
     totals = dict.fromkeys(METRIC_NAMES, 0.0)
     for item in questions:
@@ -175,7 +192,7 @@ def _log_mlflow(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--mode", choices=("tfidf", "bm25"), required=True)
+    parser.add_argument("--mode", choices=("tfidf", "bm25", "word2vec"), required=True)
     parser.add_argument(
         "--questions",
         type=Path,

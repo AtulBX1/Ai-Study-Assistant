@@ -55,12 +55,29 @@ def get_retriever(
         if cached is not None:
             _CACHE.move_to_end(key)
             return cached
-        retriever = retriever_class(chunks)
+        retriever = retriever_class(chunks, user_id=user_id)
         _CACHE[key] = retriever
         while len(_CACHE) > _CACHE_CAPACITY:
             _CACHE.popitem(last=False)
         return retriever
 
 
+def invalidate_retriever_cache(
+    name: str,
+    user_id: int,
+    document_id: int,
+) -> None:
+    """Discard cached indexes that include a document whose model was retrained."""
+    with _CACHE_LOCK:
+        stale_keys = [
+            key
+            for key in _CACHE
+            if key[0] == name and key[1] == user_id and document_id in key[2]
+        ]
+        for key in stale_keys:
+            del _CACHE[key]
+
+
 from app.retrieval.bm25 import BM25Retriever  # noqa: E402,F401
 from app.retrieval.tfidf import TfidfRetriever  # noqa: E402,F401
+from app.retrieval.word2vec import Word2VecRetriever  # noqa: E402,F401

@@ -26,7 +26,7 @@ class SearchRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     query: str = Field(min_length=1, max_length=MAX_QUERY_LENGTH)
-    mode: Literal["tfidf", "bm25"] = "tfidf"
+    mode: Literal["tfidf", "bm25", "word2vec"] = "tfidf"
     doc_ids: list[int] | None = Field(default=None, max_length=100)
     k: int = Field(default=5, ge=1, le=MAX_SEARCH_RESULTS)
 

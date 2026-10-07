@@ -42,6 +42,8 @@ storage/*
 !storage/.gitkeep
 models/*
 !models/.gitkeep
+models/glove/
+models/word2vec/
 mlruns/
 *.pt
 *.pth

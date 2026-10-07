@@ -215,6 +215,13 @@ def remove_stop_words(tokens: list[str], language: str = "en") -> list[str]:
     return [token for token in tokens if token.casefold() not in stop_words]
 
 
+def preprocess_tokens(text: str) -> list[str]:
+    """Apply the shared Step 4 normalization and retrieval token filters."""
+    normalized = normalize_text(text)
+    tokens = handle_punctuation(regex_tokenize(normalized))
+    return remove_stop_words(tokens, detect_language(normalized))
+
+
 def stem_tokens(tokens: list[str]) -> dict[str, list[str]]:
     """Return Porter and Snowball stems in parallel."""
     from nltk.stem import PorterStemmer, SnowballStemmer
