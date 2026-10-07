@@ -56,6 +56,18 @@ def _sequence_predictor(
     return get_predictor(task, architecture)
 
 
+def _seq2seq_summary(
+    text: str,
+    model: Literal["none", "bahdanau", "luong"],
+    decoding: Literal["greedy", "beam"],
+    beam_width: int,
+) -> dict[str, Any]:
+    """Load the requested trained summarizer only when called."""
+    from app.services.seq2seq_inference import summarize
+
+    return summarize(text, model, decoding, beam_width)
+
+
 class ClassifyRequest(BaseModel):
     """Bounded text and a supported task/architecture for sequence inference."""
 
@@ -72,6 +84,36 @@ class DifficultyBatchRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     document_id: int = Field(gt=0)
+
+
+class Seq2SeqSummaryRequest(BaseModel):
+    """Bounded text or an owner-scoped document page range to summarize."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    text: str | None = Field(default=None, min_length=1, max_length=MAX_INPUT_CHARS)
+    document_id: int | None = Field(default=None, gt=0)
+    page_start: int | None = Field(default=None, ge=1)
+    page_end: int | None = Field(default=None, ge=1)
+    model: Literal["none", "bahdanau", "luong"] = "bahdanau"
+    decoding: Literal["greedy", "beam"] = "beam"
+    beam_width: int = Field(default=4, ge=1, le=10)
+
+    @model_validator(mode="after")
+    def validate_source(self) -> "Seq2SeqSummaryRequest":
+        if (self.text is None) == (self.document_id is None):
+            raise ValueError("Provide exactly one of text or document_id.")
+        if self.text is not None and (
+            self.page_start is not None or self.page_end is not None
+        ):
+            raise ValueError("Page ranges can only be used with document_id.")
+        if (
+            self.page_start is not None
+            and self.page_end is not None
+            and self.page_end < self.page_start
+        ):
+            raise ValueError("page_end must be greater than or equal to page_start.")
+        return self
 
 
 class PreprocessRequest(BaseModel):
@@ -194,6 +236,56 @@ def classify_text(
         "model": request.model,
         **prediction,
     }
+
+
+@router.post("/summarize/seq2seq")
+def summarize_seq2seq(
+    request: Seq2SeqSummaryRequest,
+    db: DatabaseSession,
+    user: AuthenticatedUser,
+) -> dict[str, Any]:
+    """Summarize bounded text or pages belonging to the authenticated user."""
+    if request.text is not None:
+        text = request.text
+        source: dict[str, Any] = {"type": "provided_text"}
+    else:
+        pages = _document_pages(
+            db,
+            request.document_id,
+            user.id,
+            request.page_start,
+            request.page_end,
+        )
+        text = "\n\n".join(_page_text(pages))
+        source = {
+            "document_id": request.document_id,
+            "pages": [page.page_number for page in pages],
+        }
+    try:
+        response = _seq2seq_summary(
+            text, request.model, request.decoding, request.beam_width
+        )
+        return {**response, "source": source}
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+@router.get("/seq2seq/results")
+def seq2seq_results(user: AuthenticatedUser) -> dict[str, Any]:
+    """Return the latest locally stored held-out evaluation."""
+    import json
+
+    results_path = PROJECT_ROOT / "models" / "seq2seq" / "evaluation.json"
+    if not results_path.is_file():
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Seq2seq evaluation is not available yet; train Step 9 models first."
+            ),
+        )
+    return json.loads(results_path.read_text(encoding="utf-8"))
 
 
 @router.post("/difficulty/batch")

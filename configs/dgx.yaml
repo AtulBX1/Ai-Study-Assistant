@@ -28,3 +28,38 @@ generation_batch_size: 128
 generation_max_seq_len: 512
 generation_hidden_size: 512
 generation_epochs: 10
+
+seq2seq:
+  seed: 472
+  dataset_id: abisee/cnn_dailymail
+  dataset_config: 3.0.0
+  cache_dir: data/hf_cache
+  train_samples: 20000
+  validation_samples: 1000
+  test_samples: 1000
+  vocab_size: 50000
+  min_frequency: 2
+  source_max_length: 800
+  target_max_length: 120
+  batch_size: 64
+  eval_batch_size: 32
+  grad_accumulation_steps: 1
+  embedding_dim: 256
+  hidden_size: 512
+  num_layers: 2
+  dropout: 0.3
+  bidirectional: true
+  mixed_precision: true
+  teacher_forcing_ratio: 1.0
+  scheduled_sampling: true
+  gradient_clip_norm: 1.0
+  learning_rate: 0.0005
+  weight_decay: 0.0001
+  epochs: 10
+  early_stopping_patience: 3
+  beam_width: 4
+  length_penalty: 0.6
+  ngram_block: 3
+  coverage: false
+  mlflow: false
+  max_seconds_per_variant: 1800

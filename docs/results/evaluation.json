@@ -1,0 +1,85 @@
+{
+  "dataset_id": "abisee/cnn_dailymail",
+  "dataset_config": "3.0.0",
+  "device": "cuda",
+  "gpu": "NVIDIA GeForce RTX 3050 Laptop GPU",
+  "subset_sizes": {
+    "train": 20000,
+    "validation": 1000,
+    "test": 1000
+  },
+  "models": {
+    "none": {
+      "metrics": {
+        "greedy": {
+          "rouge1": 0.11801940505451788,
+          "rouge2": 0.007821876228683302,
+          "rougeL": 0.09629915815800283,
+          "bleu": 0.18780796068354633,
+          "average_summary_length": 40.266,
+          "repeated_trigram_rate": 0.0
+        },
+        "beam": {
+          "rouge1": 0.09629226598812507,
+          "rouge2": 0.007659018317041828,
+          "rougeL": 0.07730861696036634,
+          "bleu": 0.28350494955783956,
+          "average_summary_length": 33.614,
+          "repeated_trigram_rate": 0.0
+        }
+      },
+      "best_validation_loss": 5.481391409240308,
+      "tokens_per_second": 4028.1777333999003,
+      "peak_vram_gb": 0.4644336700439453,
+      "training_seconds": 2531.186999999918
+    },
+    "bahdanau": {
+      "metrics": {
+        "greedy": {
+          "rouge1": 0.14733548600154472,
+          "rouge2": 0.01766461892491823,
+          "rougeL": 0.1165998700931565,
+          "bleu": 0.4406430227815074,
+          "average_summary_length": 40.669,
+          "repeated_trigram_rate": 0.0
+        },
+        "beam": {
+          "rouge1": 0.12011728233809796,
+          "rouge2": 0.015299951889088203,
+          "rougeL": 0.09502346102996842,
+          "bleu": 0.4407312583311406,
+          "average_summary_length": 23.621,
+          "repeated_trigram_rate": 0.0
+        }
+      },
+      "best_validation_loss": 5.346651505328866,
+      "tokens_per_second": 2400.8755516833758,
+      "peak_vram_gb": 1.1965012550354004,
+      "training_seconds": 1524.844000000041
+    },
+    "luong": {
+      "metrics": {
+        "greedy": {
+          "rouge1": 0.13653769908778537,
+          "rouge2": 0.01269393364575756,
+          "rougeL": 0.10934490996206121,
+          "bleu": 0.2401344562046594,
+          "average_summary_length": 38.365,
+          "repeated_trigram_rate": 0.0
+        },
+        "beam": {
+          "rouge1": 0.08935273240514004,
+          "rouge2": 0.009801553852354265,
+          "rougeL": 0.07453793791618155,
+          "bleu": 0.2518642725538342,
+          "average_summary_length": 20.437,
+          "repeated_trigram_rate": 0.0
+        }
+      },
+      "best_validation_loss": 5.351780250294689,
+      "tokens_per_second": 2763.997369070025,
+      "peak_vram_gb": 0.6836261749267578,
+      "training_seconds": 1823.813000000082
+    }
+  }
+}

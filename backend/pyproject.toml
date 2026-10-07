@@ -31,6 +31,8 @@ dependencies = [
     "torch>=2.6,<3",
     "uvicorn[standard]>=0.34,<1",
     "yake>=0.6,<1",
+    "rouge-score>=0.1.2,<1",
+    "sacrebleu>=2.5,<3",
 ]
 
 [dependency-groups]
@@ -56,7 +58,11 @@ select = ["E", "F", "I", "UP", "B"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = [".", ".."]
-markers = ["slow: downloads or exercises large external embedding data"]
+markers = [
+    "slow: downloads or exercises large external embedding data",
+    "gpu: uses CUDA when available",
+    "download: downloads external dataset files",
+]
 
 [[tool.uv.index]]
 name = "pytorch-cu124"
