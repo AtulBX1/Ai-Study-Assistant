@@ -22,6 +22,7 @@ from fastapi import (
     UploadFile,
 )
 from fastapi.responses import Response, StreamingResponse
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -30,6 +31,11 @@ from app.core.database import get_db
 from app.dependencies.auth import get_current_user
 from app.models import Document, DocumentPage, DocumentStatusEvent, User
 from app.schemas.documents import DocumentPageResponse, DocumentResponse
+from app.services.chunking import (
+    DEFAULT_CHUNK_SIZE,
+    DEFAULT_OVERLAP,
+    rebuild_document_chunks,
+)
 from app.services.document_ingestion import (
     InvalidPDFError,
     PDFPageLimitError,
@@ -48,6 +54,21 @@ DatabaseSession = Annotated[Session, Depends(get_db)]
 AuthenticatedUser = Annotated[User, Depends(get_current_user)]
 _image_cache: OrderedDict[tuple[int, int, str], bytes] = OrderedDict()
 _image_cache_lock = threading.Lock()
+
+
+class RechunkRequest(BaseModel):
+    """Optional chunk size and sentence-overlap settings."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    chunk_size: int = Field(default=DEFAULT_CHUNK_SIZE, ge=1, le=2000)
+    overlap: int = Field(default=DEFAULT_OVERLAP, ge=0, le=1999)
+
+    @model_validator(mode="after")
+    def validate_overlap(self) -> "RechunkRequest":
+        if self.overlap >= self.chunk_size:
+            raise ValueError("overlap must be smaller than chunk_size.")
+        return self
 
 
 def get_document_file_storage() -> FileStorage:
@@ -205,6 +226,50 @@ def get_document_status(
 ) -> Document:
     """Return the owner-scoped current ingestion stage and progress."""
     return _owned_document(db, document_id, user.id)
+
+
+@router.post("/{document_id}/rechunk")
+def rechunk_document(
+    document_id: int,
+    request: RechunkRequest,
+    db: DatabaseSession,
+    user: AuthenticatedUser,
+) -> dict[str, object]:
+    """Rebuild an owned document's chunks with the requested boundaries."""
+    _owned_document(db, document_id, user.id)
+    has_pages = db.scalar(
+        select(DocumentPage.id).where(DocumentPage.document_id == document_id).limit(1)
+    )
+    if has_pages is None:
+        raise HTTPException(
+            status_code=409,
+            detail="The document has no extracted pages to rechunk.",
+        )
+    chunks = rebuild_document_chunks(
+        db,
+        document_id,
+        chunk_size=request.chunk_size,
+        overlap=request.overlap,
+    )
+    db.commit()
+    return {
+        "document_id": document_id,
+        "chunk_size": request.chunk_size,
+        "overlap": request.overlap,
+        "chunks": [
+            {
+                "chunk_id": chunk.id,
+                "document_id": chunk.doc_id,
+                "page_start": chunk.page_start,
+                "page_end": chunk.page_end,
+                "section": chunk.section,
+                "chunk_index": chunk.chunk_index,
+                "token_count": chunk.token_count,
+                "text": chunk.text,
+            }
+            for chunk in chunks
+        ],
+    }
 
 
 @router.get("/{document_id}/events")

@@ -1,0 +1,242 @@
+[
+  {
+    "question": "What does the document say about frequency?",
+    "relevant_pages": [
+      1
+    ],
+    "document": "data/samples/text.pdf",
+    "source_sentence": "Text Processing\nTF-IDF represents documents using term frequency and inverse document frequency."
+  },
+  {
+    "question": "How is text described in the document?",
+    "relevant_pages": [
+      1
+    ],
+    "document": "data/samples/text.pdf",
+    "source_sentence": "Text Processing\nTF-IDF represents documents using term frequency and inverse document frequency."
+  },
+  {
+    "question": "Which idea in the document is connected to document?",
+    "relevant_pages": [
+      1
+    ],
+    "document": "data/samples/text.pdf",
+    "source_sentence": "Text Processing\nTF-IDF represents documents using term frequency and inverse document frequency."
+  },
+  {
+    "question": "What role does documents have in the material?",
+    "relevant_pages": [
+      1
+    ],
+    "document": "data/samples/text.pdf",
+    "source_sentence": "Text Processing\nTF-IDF represents documents using term frequency and inverse document frequency."
+  },
+  {
+    "question": "What information about idf can be found in the document?",
+    "relevant_pages": [
+      1
+    ],
+    "document": "data/samples/text.pdf",
+    "source_sentence": "Text Processing\nTF-IDF represents documents using term frequency and inverse document frequency."
+  },
+  {
+    "question": "How does the document explain inverse?",
+    "relevant_pages": [
+      1
+    ],
+    "document": "data/samples/text.pdf",
+    "source_sentence": "Text Processing\nTF-IDF represents documents using term frequency and inverse document frequency."
+  },
+  {
+    "question": "What does the document say about normalization?",
+    "relevant_pages": [
+      1
+    ],
+    "document": "data/samples/text.pdf",
+    "source_sentence": "A tokenizer splits text into tokens before normalization and vectorization."
+  },
+  {
+    "question": "How is processing described in the document?",
+    "relevant_pages": [
+      1
+    ],
+    "document": "data/samples/text.pdf",
+    "source_sentence": "Text Processing\nTF-IDF represents documents using term frequency and inverse document frequency."
+  },
+  {
+    "question": "Which idea in the document is connected to represents?",
+    "relevant_pages": [
+      1
+    ],
+    "document": "data/samples/text.pdf",
+    "source_sentence": "Text Processing\nTF-IDF represents documents using term frequency and inverse document frequency."
+  },
+  {
+    "question": "What role does splits have in the material?",
+    "relevant_pages": [
+      1
+    ],
+    "document": "data/samples/text.pdf",
+    "source_sentence": "A tokenizer splits text into tokens before normalization and vectorization."
+  },
+  {
+    "question": "What information about term can be found in the document?",
+    "relevant_pages": [
+      1
+    ],
+    "document": "data/samples/text.pdf",
+    "source_sentence": "Text Processing\nTF-IDF represents documents using term frequency and inverse document frequency."
+  },
+  {
+    "question": "How does the document explain tokenizer?",
+    "relevant_pages": [
+      1
+    ],
+    "document": "data/samples/text.pdf",
+    "source_sentence": "A tokenizer splits text into tokens before normalization and vectorization."
+  },
+  {
+    "question": "What does the document say about tokens?",
+    "relevant_pages": [
+      1
+    ],
+    "document": "data/samples/text.pdf",
+    "source_sentence": "A tokenizer splits text into tokens before normalization and vectorization."
+  },
+  {
+    "question": "How is using described in the document?",
+    "relevant_pages": [
+      1
+    ],
+    "document": "data/samples/text.pdf",
+    "source_sentence": "Text Processing\nTF-IDF represents documents using term frequency and inverse document frequency."
+  },
+  {
+    "question": "Which idea in the document is connected to vectorization?",
+    "relevant_pages": [
+      1
+    ],
+    "document": "data/samples/text.pdf",
+    "source_sentence": "A tokenizer splits text into tokens before normalization and vectorization."
+  },
+  {
+    "question": "How is frequency described in the document?",
+    "relevant_pages": [
+      1
+    ],
+    "document": "data/samples/text.pdf",
+    "source_sentence": "Text Processing\nTF-IDF represents documents using term frequency and inverse document frequency."
+  },
+  {
+    "question": "Which idea in the document is connected to text?",
+    "relevant_pages": [
+      1
+    ],
+    "document": "data/samples/text.pdf",
+    "source_sentence": "Text Processing\nTF-IDF represents documents using term frequency and inverse document frequency."
+  },
+  {
+    "question": "What role does document have in the material?",
+    "relevant_pages": [
+      1
+    ],
+    "document": "data/samples/text.pdf",
+    "source_sentence": "Text Processing\nTF-IDF represents documents using term frequency and inverse document frequency."
+  },
+  {
+    "question": "What information about documents can be found in the document?",
+    "relevant_pages": [
+      1
+    ],
+    "document": "data/samples/text.pdf",
+    "source_sentence": "Text Processing\nTF-IDF represents documents using term frequency and inverse document frequency."
+  },
+  {
+    "question": "How does the document explain idf?",
+    "relevant_pages": [
+      1
+    ],
+    "document": "data/samples/text.pdf",
+    "source_sentence": "Text Processing\nTF-IDF represents documents using term frequency and inverse document frequency."
+  },
+  {
+    "question": "What does the document say about inverse?",
+    "relevant_pages": [
+      1
+    ],
+    "document": "data/samples/text.pdf",
+    "source_sentence": "Text Processing\nTF-IDF represents documents using term frequency and inverse document frequency."
+  },
+  {
+    "question": "How is normalization described in the document?",
+    "relevant_pages": [
+      1
+    ],
+    "document": "data/samples/text.pdf",
+    "source_sentence": "A tokenizer splits text into tokens before normalization and vectorization."
+  },
+  {
+    "question": "Which idea in the document is connected to processing?",
+    "relevant_pages": [
+      1
+    ],
+    "document": "data/samples/text.pdf",
+    "source_sentence": "Text Processing\nTF-IDF represents documents using term frequency and inverse document frequency."
+  },
+  {
+    "question": "What role does represents have in the material?",
+    "relevant_pages": [
+      1
+    ],
+    "document": "data/samples/text.pdf",
+    "source_sentence": "Text Processing\nTF-IDF represents documents using term frequency and inverse document frequency."
+  },
+  {
+    "question": "What information about splits can be found in the document?",
+    "relevant_pages": [
+      1
+    ],
+    "document": "data/samples/text.pdf",
+    "source_sentence": "A tokenizer splits text into tokens before normalization and vectorization."
+  },
+  {
+    "question": "How does the document explain term?",
+    "relevant_pages": [
+      1
+    ],
+    "document": "data/samples/text.pdf",
+    "source_sentence": "Text Processing\nTF-IDF represents documents using term frequency and inverse document frequency."
+  },
+  {
+    "question": "What does the document say about tokenizer?",
+    "relevant_pages": [
+      1
+    ],
+    "document": "data/samples/text.pdf",
+    "source_sentence": "A tokenizer splits text into tokens before normalization and vectorization."
+  },
+  {
+    "question": "How is tokens described in the document?",
+    "relevant_pages": [
+      1
+    ],
+    "document": "data/samples/text.pdf",
+    "source_sentence": "A tokenizer splits text into tokens before normalization and vectorization."
+  },
+  {
+    "question": "Which idea in the document is connected to using?",
+    "relevant_pages": [
+      1
+    ],
+    "document": "data/samples/text.pdf",
+    "source_sentence": "Text Processing\nTF-IDF represents documents using term frequency and inverse document frequency."
+  },
+  {
+    "question": "What role does vectorization have in the material?",
+    "relevant_pages": [
+      1
+    ],
+    "document": "data/samples/text.pdf",
+    "source_sentence": "A tokenizer splits text into tokens before normalization and vectorization."
+  }
+]

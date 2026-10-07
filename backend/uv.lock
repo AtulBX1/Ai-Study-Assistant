@@ -27,6 +27,7 @@ dependencies = [
     { name = "python-multipart" },
     { name = "qdrant-client" },
     { name = "rake-nltk" },
+    { name = "rank-bm25" },
     { name = "redis" },
     { name = "scikit-learn" },
     { name = "spacy" },
@@ -61,6 +62,7 @@ requires-dist = [
     { name = "python-multipart", specifier = ">=0.0.20,<1" },
     { name = "qdrant-client", specifier = ">=1.13,<2" },
     { name = "rake-nltk", specifier = ">=1.0,<2" },
+    { name = "rank-bm25", specifier = ">=0.2.2,<1" },
     { name = "redis", specifier = ">=5,<7" },
     { name = "scikit-learn", specifier = ">=1.6,<2" },
     { name = "spacy", specifier = ">=3.8,<4" },
@@ -1520,6 +1522,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/da/b1/53392b9ba76fdb1e9de3198f63eb1cb92529c80201e0709162d140134b30/rake-nltk-1.0.6.tar.gz", hash = "sha256:7813d680b2ce77b51cdac1757f801a87ff47682c9dbd2982aea3b66730346122", size = 9089, upload-time = "2021-09-15T05:13:18.346Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/3b/e5/18876d587142df57b1c70ef752da34664bb7dd383710ccf3ccaefba2aa0c/rake_nltk-1.0.6-py3-none-any.whl", hash = "sha256:1c1ffdb64cae8cb99d169d53a5ffa4635f1c4abd3a02c6e22d5d083136bdc5c1", size = 9103, upload-time = "2021-09-15T05:13:19.937Z" },
+]
+
+[[package]]
+name = "rank-bm25"
+version = "0.2.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/fc/0a/f9579384aa017d8b4c15613f86954b92a95a93d641cc849182467cf0bb3b/rank_bm25-0.2.2.tar.gz", hash = "sha256:096ccef76f8188563419aaf384a02f0ea459503fdf77901378d4fd9d87e5e51d", size = 8347, upload-time = "2022-02-16T12:10:52.196Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/2a/21/f691fb2613100a62b3fa91e9988c991e9ca5b89ea31c0d3152a3210344f9/rank_bm25-0.2.2-py3-none-any.whl", hash = "sha256:7bd4a95571adadfc271746fa146a4bcfd89c0cf731e49c3d1ad863290adbe8ae", size = 8584, upload-time = "2022-02-16T12:10:50.626Z" },
 ]
 
 [[package]]

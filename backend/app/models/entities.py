@@ -135,9 +135,12 @@ class Chunk(Base):
         ForeignKey("documents.id", ondelete="CASCADE"), index=True
     )
     page: Mapped[int] = mapped_column(Integer)
+    page_start: Mapped[int] = mapped_column(Integer, default=1)
+    page_end: Mapped[int] = mapped_column(Integer, default=1)
     section: Mapped[str | None] = mapped_column(String(255))
     text: Mapped[str] = mapped_column(Text)
     token_count: Mapped[int] = mapped_column(Integer, default=0)
+    chunk_index: Mapped[int] = mapped_column(Integer, default=0)
     vector_id: Mapped[str | None] = mapped_column(String(128), unique=True)
     document: Mapped[Document] = relationship(back_populates="chunks")
 

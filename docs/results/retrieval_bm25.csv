@@ -1,0 +1,2 @@
+mode,questions,k,precision_at_k,recall_at_k,mrr,ndcg_at_k
+bm25,30,5,0.2000000000000001,1.0,1.0,1.0

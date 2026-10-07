@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.models import Document, DocumentPage, DocumentStatusEvent
 from app.nlp.preprocessing import normalize_text
+from app.services.chunking import rebuild_document_chunks
 from app.services.file_storage import FileStorage
 
 
@@ -211,6 +212,7 @@ def ingest_document(
                     )
 
         _record_state(db, document, "indexing", 90)
+        rebuild_document_chunks(db, document_id)
         _record_state(db, document, "ready", 100)
     except Exception as error:
         db.rollback()

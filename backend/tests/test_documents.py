@@ -14,7 +14,7 @@ from sqlalchemy import select
 
 from app.core.config import Settings, get_settings
 from app.main import app
-from app.models import Document, DocumentPage, DocumentStatusEvent, User
+from app.models import Chunk, Document, DocumentPage, DocumentStatusEvent, User
 from app.nlp.preprocessing import normalize_text
 from app.routers.documents import (
     get_document_file_storage,
@@ -185,6 +185,10 @@ def test_ingestion_tracks_stages_and_returns_page_text_and_image(
     )
     assert stages[0] == "queued"
     assert {"extracting", "processing", "indexing", "ready"}.issubset(stages)
+    indexed_chunk = db_session.scalar(select(Chunk).where(Chunk.doc_id == document_id))
+    assert indexed_chunk is not None
+    assert indexed_chunk.page_start == indexed_chunk.page_end == 1
+    assert indexed_chunk.token_count > 0
 
     page = document_context.client.get(
         f"/documents/{document_id}/pages/1",
