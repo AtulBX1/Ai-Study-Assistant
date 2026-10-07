@@ -1,0 +1,257 @@
+{
+  "document": "data/real_docs/nlp_notes.pdf",
+  "questions": [
+    {
+      "question": "What does natural language processing enable computers to do with human language?",
+      "question_type": "keyword",
+      "relevant_chunk_ids": [4],
+      "needs_review": true
+    },
+    {
+      "question": "How does NLP bridge the gap between flexible human communication and the rigid inputs computers understand?",
+      "question_type": "paraphrased",
+      "relevant_chunk_ids": [3],
+      "needs_review": true
+    },
+    {
+      "question": "Which applications of NLP are listed in the notes?",
+      "question_type": "keyword",
+      "relevant_chunk_ids": [5],
+      "needs_review": true
+    },
+    {
+      "question": "Which chunk describes the shift from hand-coded language rules to data-driven methods and neural networks?",
+      "question_type": "paraphrased",
+      "relevant_chunk_ids": [6, 7, 8],
+      "needs_review": true
+    },
+    {
+      "question": "Contrast the rule-based, statistical, and deep-learning eras by their main techniques and examples.",
+      "question_type": "multi_sentence",
+      "relevant_chunk_ids": [6, 7, 8],
+      "needs_review": true
+    },
+    {
+      "question": "Which era introduced neural networks and transformers, with BERT and GPT as examples?",
+      "question_type": "keyword",
+      "relevant_chunk_ids": [8],
+      "needs_review": true
+    },
+    {
+      "question": "Why do machines have more difficulty than people with sarcasm, intent, and meanings implied by context?",
+      "question_type": "paraphrased",
+      "relevant_chunk_ids": [12, 18],
+      "needs_review": true
+    },
+    {
+      "question": "People adapt naturally to slang, while language systems may need retraining for new patterns. Which passage compares this flexibility and how people learn?",
+      "question_type": "multi_sentence",
+      "relevant_chunk_ids": [13, 21],
+      "needs_review": true
+    },
+    {
+      "question": "In the examples cat to cats and happy to happiness, which type of morphology applies to each?",
+      "question_type": "keyword",
+      "relevant_chunk_ids": [55, 56],
+      "needs_review": true
+    },
+    {
+      "question": "Which example changes grammatical form without creating a new word meaning, and which creates a related new word?",
+      "question_type": "paraphrased",
+      "relevant_chunk_ids": [55, 56],
+      "needs_review": true
+    },
+    {
+      "question": "What drawback is associated with the Lancaster stemmer?",
+      "question_type": "keyword",
+      "relevant_chunk_ids": [35, 37],
+      "needs_review": true
+    },
+    {
+      "question": "Why can an especially aggressive word-reduction method make the resulting text harder to read?",
+      "question_type": "paraphrased",
+      "relevant_chunk_ids": [35, 37],
+      "needs_review": true
+    },
+    {
+      "question": "What NLP difficulty occurs when one word or sentence can have several possible meanings?",
+      "question_type": "keyword",
+      "relevant_chunk_ids": [38],
+      "needs_review": true
+    },
+    {
+      "question": "Idioms cannot always be interpreted literally, and their intended sense can depend on culture. Which section discusses this challenge?",
+      "question_type": "multi_sentence",
+      "relevant_chunk_ids": [40],
+      "needs_review": true
+    },
+    {
+      "question": "What does a parser need in order to choose the intended interpretation of an ambiguous sentence?",
+      "question_type": "paraphrased",
+      "relevant_chunk_ids": [38, 39],
+      "needs_review": true
+    },
+    {
+      "question": "What does named entity recognition identify and classify?",
+      "question_type": "keyword",
+      "relevant_chunk_ids": [41],
+      "needs_review": true
+    },
+    {
+      "question": "A system must locate people, organizations, and places in text, but ambiguous names complicate the task. Which NLP section covers this?",
+      "question_type": "multi_sentence",
+      "relevant_chunk_ids": [41, 42],
+      "needs_review": true
+    },
+    {
+      "question": "What benefits of removing stopwords are listed in the notes?",
+      "question_type": "keyword",
+      "relevant_chunk_ids": [67, 71],
+      "needs_review": true
+    },
+    {
+      "question": "How does filtering common function words affect vocabulary size, noise, and model training?",
+      "question_type": "paraphrased",
+      "relevant_chunk_ids": [66, 67, 71],
+      "needs_review": true
+    },
+    {
+      "question": "Why might a translation or question-answering system need to retain words that a generic preprocessing pipeline would remove?",
+      "question_type": "multi_sentence",
+      "relevant_chunk_ids": [72, 75],
+      "needs_review": true
+    },
+    {
+      "question": "Which warning explains that removing every frequent word can discard information needed for meaning?",
+      "question_type": "paraphrased",
+      "relevant_chunk_ids": [72, 75, 77],
+      "needs_review": true
+    },
+    {
+      "question": "What is an example of a domain-specific stopword in the notes?",
+      "question_type": "keyword",
+      "relevant_chunk_ids": [81, 86],
+      "needs_review": true
+    },
+    {
+      "question": "Which punctuation characters are given as examples of symbols that preprocessing can remove?",
+      "question_type": "keyword",
+      "relevant_chunk_ids": [88, 95],
+      "needs_review": true
+    },
+    {
+      "question": "How can cleaning punctuation make two differently punctuated versions of a word compare consistently?",
+      "question_type": "paraphrased",
+      "relevant_chunk_ids": [90, 97],
+      "needs_review": true
+    },
+    {
+      "question": "The notes say punctuation can create noise and extra token forms. What effects does removing it have on model accuracy and vocabulary size?",
+      "question_type": "multi_sentence",
+      "relevant_chunk_ids": [91, 92, 96, 98],
+      "needs_review": true
+    },
+    {
+      "question": "What is an N-gram?",
+      "question_type": "keyword",
+      "relevant_chunk_ids": [109, 110],
+      "needs_review": true
+    },
+    {
+      "question": "Compared with an unordered word-count representation, what does a sequence of adjacent terms preserve?",
+      "question_type": "paraphrased",
+      "relevant_chunk_ids": [113, 114],
+      "needs_review": true
+    },
+    {
+      "question": "What does out-of-vocabulary mean for a word embedding or language model?",
+      "question_type": "keyword",
+      "relevant_chunk_ids": [117, 118],
+      "needs_review": true
+    },
+    {
+      "question": "Why must text be represented numerically before a conventional machine-learning model can process it?",
+      "question_type": "paraphrased",
+      "relevant_chunk_ids": [100, 101],
+      "needs_review": true
+    },
+    {
+      "question": "What information does Bag-of-Words retain, and which linguistic properties does it ignore?",
+      "question_type": "keyword",
+      "relevant_chunk_ids": [105, 106],
+      "needs_review": true
+    },
+    {
+      "question": "In the matrix produced by CountVectorizer, what does each row stand for and what do the columns enumerate?",
+      "question_type": "multi_sentence",
+      "relevant_chunk_ids": [165, 168],
+      "needs_review": true
+    },
+    {
+      "question": "Which terms receive larger TF-IDF weights when they are uncommon but informative?",
+      "question_type": "keyword",
+      "relevant_chunk_ids": [166, 167],
+      "needs_review": true
+    },
+    {
+      "question": "Why does TF-IDF treat words appearing in many documents as less useful for distinguishing one document from another?",
+      "question_type": "paraphrased",
+      "relevant_chunk_ids": [189, 190],
+      "needs_review": true
+    },
+    {
+      "question": "Which preprocessing and vectorization steps does the lab pipeline ask students to implement?",
+      "question_type": "keyword",
+      "relevant_chunk_ids": [125, 128],
+      "needs_review": true
+    },
+    {
+      "question": "A raw collection of documents must be prepared for a machine-learning model. Which lab passage describes cleaning text and then constructing numerical features?",
+      "question_type": "multi_sentence",
+      "relevant_chunk_ids": [128],
+      "needs_review": true
+    },
+    {
+      "question": "In the regular expression re.sub(r'\\d+', '', text), what happens to digit sequences?",
+      "question_type": "keyword",
+      "relevant_chunk_ids": [149, 172],
+      "needs_review": true
+    },
+    {
+      "question": "Which operation divides a sentence such as 'nlp is fun' into separate word units?",
+      "question_type": "paraphrased",
+      "relevant_chunk_ids": [150],
+      "needs_review": true
+    },
+    {
+      "question": "What does stemming do to a token?",
+      "question_type": "keyword",
+      "relevant_chunk_ids": [154, 158],
+      "needs_review": true
+    },
+    {
+      "question": "How does lemmatization differ from chopping a word down to a crude root?",
+      "question_type": "paraphrased",
+      "relevant_chunk_ids": [156, 160],
+      "needs_review": true
+    },
+    {
+      "question": "The example stems tokens before passing them to a lemmatizer. What problem can that ordering cause, and why?",
+      "question_type": "multi_sentence",
+      "relevant_chunk_ids": [179, 180, 181],
+      "needs_review": true
+    },
+    {
+      "question": "Why store stopwords in a set rather than a list?",
+      "question_type": "keyword",
+      "relevant_chunk_ids": [175, 176],
+      "needs_review": true
+    },
+    {
+      "question": "How does converting text to one consistent letter case affect vocabulary entries such as AI and ai?",
+      "question_type": "paraphrased",
+      "relevant_chunk_ids": [193, 194, 195],
+      "needs_review": true
+    }
+  ]
+}

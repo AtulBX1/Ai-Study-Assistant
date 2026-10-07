@@ -1,2 +1,2 @@
-mode,questions,k,precision_at_k,recall_at_k,mrr,ndcg_at_k
-bm25,30,5,0.2000000000000001,1.0,1.0,1.0
+mode,questions,k,precision_at_k,recall_at_k,mrr,ndcg_at_k,average_latency_ms
+bm25,42,5,0.1952380952380953,0.5119047619047619,0.6904761904761905,0.5514476256183042,0.6503714331691819

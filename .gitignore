@@ -33,6 +33,8 @@ data/*
 !data/.gitkeep
 !data/eval/
 !data/eval/questions_sample.json
+!data/eval/questions_real.json
+data/real_docs/
 !data/samples/
 data/samples/*
 !data/samples/*.pdf
@@ -42,6 +44,7 @@ storage/*
 !storage/.gitkeep
 models/*
 !models/.gitkeep
+models/hf/
 models/glove/
 models/word2vec/
 mlruns/

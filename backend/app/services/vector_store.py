@@ -1,12 +1,13 @@
 """Vector-store interface with local Qdrant and server-backed adapters."""
 
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Protocol
 
 from qdrant_client import QdrantClient, models
 
-from app.core.config import Settings, get_settings
+from app.core.config import PROJECT_ROOT, Settings, get_settings
 
 
 @dataclass(frozen=True)
@@ -31,12 +32,20 @@ class VectorStore(Protocol):
         """Insert or replace vector points."""
 
     def search(
-        self, collection: str, vector: list[float], limit: int = 5
+        self,
+        collection: str,
+        vector: list[float],
+        limit: int = 5,
+        user_id: int | None = None,
+        document_ids: list[int] | None = None,
     ) -> list[VectorMatch]:
-        """Return the closest vector points."""
+        """Return closest points, optionally restricted by owner and documents."""
 
     def delete_document(self, document_id: int) -> None:
         """Remove vector points whose payload belongs to a document."""
+
+    def delete_ids(self, collection: str, ids: list[str]) -> None:
+        """Remove selected vector points from a collection."""
 
 
 class QdrantVectorStore:
@@ -74,15 +83,46 @@ class QdrantVectorStore:
         self._client.upsert(collection_name=collection, points=points)
 
     def search(
-        self, collection: str, vector: list[float], limit: int = 5
+        self,
+        collection: str,
+        vector: list[float],
+        limit: int = 5,
+        user_id: int | None = None,
+        document_ids: list[int] | None = None,
     ) -> list[VectorMatch]:
+        if limit < 1:
+            raise ValueError("limit must be at least 1.")
+        if document_ids is not None and not document_ids:
+            return []
+        conditions = []
+        if user_id is not None:
+            conditions.append(
+                models.FieldCondition(
+                    key="user_id",
+                    match=models.MatchValue(value=user_id),
+                )
+            )
+        if document_ids is not None:
+            conditions.append(
+                models.FieldCondition(
+                    key="document_id",
+                    match=models.MatchAny(any=document_ids),
+                )
+            )
         results = self._client.query_points(
-            collection_name=collection, query=vector, limit=limit
+            collection_name=collection,
+            query=vector,
+            query_filter=models.Filter(must=conditions) if conditions else None,
+            limit=limit,
         ).points
         return [
             VectorMatch(id=str(point.id), score=point.score, payload=point.payload)
             for point in results
         ]
+
+    def delete_ids(self, collection: str, ids: list[str]) -> None:
+        if ids and self._client.collection_exists(collection):
+            self._client.delete(collection_name=collection, points_selector=ids)
 
     def delete_document(self, document_id: int) -> None:
         selector = models.FilterSelector(
@@ -106,11 +146,23 @@ def create_vector_store(settings: Settings | None = None) -> VectorStore:
     """Select persistent local Qdrant or a Qdrant server from BACKEND."""
     runtime_settings = settings or get_settings()
     if runtime_settings.backend == "local":
-        Path(runtime_settings.qdrant_local_path).mkdir(parents=True, exist_ok=True)
-        client = QdrantClient(path=runtime_settings.qdrant_local_path)
+        local_path = Path(runtime_settings.qdrant_local_path)
+        if not local_path.is_absolute():
+            local_path = PROJECT_ROOT / local_path
+        local_path.mkdir(parents=True, exist_ok=True)
+        client = QdrantClient(path=str(local_path.resolve()))
     else:
         runtime_settings.validate_vector_backend()
         if runtime_settings.qdrant_url is None:
             raise ValueError("QDRANT_URL is required when BACKEND=prod.")
-        client = QdrantClient(url=runtime_settings.qdrant_url)
+        client = QdrantClient(
+            url=runtime_settings.qdrant_url,
+            api_key=runtime_settings.qdrant_api_key,
+        )
     return QdrantVectorStore(client)
+
+
+@lru_cache(maxsize=1)
+def get_vector_store() -> VectorStore:
+    """Return the process-wide configured vector-store adapter."""
+    return create_vector_store()

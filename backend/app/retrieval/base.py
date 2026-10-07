@@ -3,6 +3,7 @@
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import Any
 
 from app.nlp.preprocessing import preprocess_tokens
 
@@ -19,6 +20,7 @@ class ChunkRecord:
     page_start: int
     page_end: int
     section: str | None = None
+    vector_id: str | None = None
 
     @property
     def page(self) -> int:
@@ -38,6 +40,9 @@ class RetrievalResult:
     section: str | None
     score: float
     rank: int
+    original_score: float | None = None
+    rerank_score: float | None = None
+    components: dict[str, Any] | None = None
 
 
 class Retriever(ABC):
@@ -88,6 +93,11 @@ class Retriever(ABC):
                 section=chunk.section,
                 score=float(score),
                 rank=rank,
+                components=self.explain(chunk.chunk_id),
             )
             for rank, (score, _, chunk) in enumerate(ranked, start=1)
         ]
+
+    def explain(self, chunk_id: int) -> dict[str, Any] | None:
+        """Return retriever-specific score details when available."""
+        return None

@@ -1,10 +1,13 @@
 """Environment-backed application configuration."""
 
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 
 class Settings(BaseSettings):
@@ -26,8 +29,17 @@ class Settings(BaseSettings):
     rate_limit_ip_per_minute: int = 120
     rate_limit_user_per_minute: int = 60
     qdrant_url: str | None = None
-    qdrant_local_path: str = "./data/qdrant"
+    qdrant_api_key: str | None = None
+    qdrant_local_path: str = str(PROJECT_ROOT / "data" / "qdrant")
+    qdrant_collection: str = "document_chunks"
     storage_path: str = "../storage"
+    hf_home: str = str(PROJECT_ROOT / "models" / "hf")
+    embedding_model_name: str = "sentence-transformers/all-MiniLM-L6-v2"
+    reranker_model_name: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+    embedding_device: str = "cpu"
+    embedding_batch_size: int = Field(default=16, ge=1, le=256)
+    hybrid_dense_weight: float = Field(default=0.5, ge=0, le=1)
+    rrf_k: int = Field(default=60, ge=1)
     max_pdf_size_bytes: int = Field(default=20 * 1024 * 1024, gt=0)
     max_pdf_pages: int = Field(default=500, gt=0)
     page_image_cache_size: int = Field(default=32, gt=0)

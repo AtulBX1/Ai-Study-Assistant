@@ -7,10 +7,14 @@ from threading import RLock
 from typing import TypeVar
 
 from app.retrieval.base import ChunkRecord, Retriever
+from app.services.embeddings import EmbeddingService
+from app.services.vector_store import VectorStore
 
 RetrieverType = TypeVar("RetrieverType", bound=type[Retriever])
 _REGISTRY: dict[str, type[Retriever]] = {}
-_CACHE: OrderedDict[tuple[str, int, tuple[int, ...], str], Retriever] = OrderedDict()
+_CACHE: OrderedDict[tuple[str, int, tuple[int, ...], str, int, int], Retriever] = (
+    OrderedDict()
+)
 _CACHE_LOCK = RLock()
 _CACHE_CAPACITY = 32
 
@@ -33,6 +37,7 @@ def _fingerprint(chunks: Sequence[ChunkRecord]) -> str:
     content = "\n".join(
         f"{chunk.chunk_id}:{chunk.document_id}:{chunk.page_start}:"
         f"{chunk.page_end}:{chunk.section or ''}:{chunk.text}"
+        f":{chunk.vector_id or ''}"
         for chunk in chunks
     )
     return hashlib.sha256(content.encode("utf-8")).hexdigest()
@@ -42,6 +47,9 @@ def get_retriever(
     name: str,
     user_id: int,
     chunks: Sequence[ChunkRecord],
+    *,
+    vector_store: VectorStore | None = None,
+    embedding_service: EmbeddingService | None = None,
 ) -> Retriever:
     """Get or build a cache-isolated retriever, rebuilding on content changes."""
     try:
@@ -49,13 +57,28 @@ def get_retriever(
     except KeyError as error:
         raise ValueError(f"Unknown retriever mode: {name}.") from error
     document_ids = tuple(sorted({chunk.document_id for chunk in chunks}))
-    key = (name, user_id, document_ids, _fingerprint(chunks))
+    key = (
+        name,
+        user_id,
+        document_ids,
+        _fingerprint(chunks),
+        id(vector_store) if vector_store is not None else 0,
+        id(embedding_service) if embedding_service is not None else 0,
+    )
     with _CACHE_LOCK:
         cached = _CACHE.get(key)
         if cached is not None:
             _CACHE.move_to_end(key)
             return cached
-        retriever = retriever_class(chunks, user_id=user_id)
+        if name in {"dense", "hybrid"}:
+            retriever = retriever_class(
+                chunks,
+                user_id=user_id,
+                vector_store=vector_store,
+                embedding_service=embedding_service,
+            )
+        else:
+            retriever = retriever_class(chunks, user_id=user_id)
         _CACHE[key] = retriever
         while len(_CACHE) > _CACHE_CAPACITY:
             _CACHE.popitem(last=False)
@@ -79,5 +102,7 @@ def invalidate_retriever_cache(
 
 
 from app.retrieval.bm25 import BM25Retriever  # noqa: E402,F401
+from app.retrieval.dense import DenseRetriever  # noqa: E402,F401
+from app.retrieval.hybrid import HybridRetriever  # noqa: E402,F401
 from app.retrieval.tfidf import TfidfRetriever  # noqa: E402,F401
 from app.retrieval.word2vec import Word2VecRetriever  # noqa: E402,F401

@@ -1,0 +1,2 @@
+mode,questions,k,precision_at_k,recall_at_k,mrr,ndcg_at_k,average_latency_ms
+hybrid+rerank,42,5,0.1952380952380953,0.5257936507936507,0.6904761904761905,0.5624039964618055,1302.6107190332066

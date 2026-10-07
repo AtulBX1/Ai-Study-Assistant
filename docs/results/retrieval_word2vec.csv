@@ -1,2 +1,2 @@
-mode,questions,k,precision_at_k,recall_at_k,mrr,ndcg_at_k
-word2vec,30,5,0.2000000000000001,1.0,1.0,1.0
+mode,questions,k,precision_at_k,recall_at_k,mrr,ndcg_at_k,average_latency_ms
+word2vec,42,5,0.03333333333333333,0.06746031746031746,0.14285714285714285,0.08472737942422433,2.194516662885213

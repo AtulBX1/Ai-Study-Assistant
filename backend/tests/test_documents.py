@@ -17,6 +17,7 @@ from app.main import app
 from app.models import Chunk, Document, DocumentPage, DocumentStatusEvent, User
 from app.nlp.preprocessing import normalize_text
 from app.routers.documents import (
+    get_document_embedding_service,
     get_document_file_storage,
     get_document_job_queue,
     get_document_vector_store,
@@ -38,15 +39,24 @@ class RecordingQueue:
 class NoopVectorStore:
     def __init__(self) -> None:
         self.deleted_documents: list[int] = []
+        self.upserted: list[tuple[list[str], list[dict[str, Any]]]] = []
 
     def upsert(self, collection, ids, vectors, payloads=None) -> None:
+        self.upserted.append((ids, payloads or []))
+
+    def search(self, collection, vector, limit=5, user_id=None, document_ids=None):
         raise NotImplementedError
 
-    def search(self, collection, vector, limit=5):
-        raise NotImplementedError
+    def delete_ids(self, collection, ids) -> None:
+        return None
 
     def delete_document(self, document_id: int) -> None:
         self.deleted_documents.append(document_id)
+
+
+class FakeEmbeddingService:
+    def embed_texts(self, texts: list[str]) -> list[list[float]]:
+        return [[1.0, 0.0] for _ in texts]
 
 
 @dataclass
@@ -58,6 +68,7 @@ class DocumentTestContext:
     owner: User
     headers: dict[str, str]
     settings: Settings
+    embedding_service: FakeEmbeddingService
 
 
 @pytest.fixture
@@ -67,6 +78,7 @@ def document_context(
     storage = LocalFileStorage(tmp_path / "pdf-storage")
     queue = RecordingQueue()
     vector_store = NoopVectorStore()
+    embedding_service = FakeEmbeddingService()
     settings = Settings(
         max_pdf_size_bytes=20 * 1024 * 1024,
         max_pdf_pages=500,
@@ -83,6 +95,7 @@ def document_context(
         get_document_file_storage: lambda: storage,
         get_document_job_queue: lambda: queue,
         get_document_vector_store: lambda: vector_store,
+        get_document_embedding_service: lambda: embedding_service,
         get_settings: lambda: settings,
     }
     app.dependency_overrides.update(overrides)
@@ -94,6 +107,7 @@ def document_context(
         owner=owner,
         headers={"Authorization": f"Bearer {access_token_for(owner.id)}"},
         settings=settings,
+        embedding_service=embedding_service,
     )
     yield context
     for dependency in overrides:
@@ -119,6 +133,20 @@ def _upload(
                 "application/octet-stream",
             )
         },
+    )
+
+
+def _ingest(
+    document_id: int,
+    db_session,
+    context: DocumentTestContext,
+) -> None:
+    ingest_document(
+        document_id,
+        db_session,
+        context.storage,
+        vector_store=context.vector_store,
+        embedding_service=context.embedding_service,
     )
 
 
@@ -168,7 +196,7 @@ def test_ingestion_tracks_stages_and_returns_page_text_and_image(
     uploaded = _upload(document_context)
     document_id = uploaded.json()["id"]
 
-    ingest_document(document_id, db_session, document_context.storage)
+    _ingest(document_id, db_session, document_context)
 
     status = document_context.client.get(
         f"/documents/{document_id}/status",
@@ -189,6 +217,14 @@ def test_ingestion_tracks_stages_and_returns_page_text_and_image(
     assert indexed_chunk is not None
     assert indexed_chunk.page_start == indexed_chunk.page_end == 1
     assert indexed_chunk.token_count > 0
+    assert indexed_chunk.vector_id is not None
+    assert document_context.vector_store.upserted
+    payload = document_context.vector_store.upserted[-1][1][0]
+    assert payload["user_id"] == document_context.owner.id
+    assert payload["document_id"] == document_id
+    assert payload["chunk_id"] == indexed_chunk.id
+    assert payload["page"] == indexed_chunk.page
+    assert payload["section"] == indexed_chunk.section
 
     page = document_context.client.get(
         f"/documents/{document_id}/pages/1",
@@ -228,7 +264,7 @@ def test_ingestion_extracts_structured_tables(
     uploaded = _upload(document_context, _sample("tables.pdf"))
     document_id = uploaded.json()["id"]
 
-    ingest_document(document_id, db_session, document_context.storage)
+    _ingest(document_id, db_session, document_context)
 
     page = db_session.scalar(
         select(DocumentPage).where(
@@ -256,7 +292,7 @@ def test_scanned_page_records_clear_marker_when_tesseract_is_unavailable(
     uploaded = _upload(document_context, _sample("scanned.pdf"))
     document_id = uploaded.json()["id"]
 
-    ingest_document(document_id, db_session, document_context.storage)
+    _ingest(document_id, db_session, document_context)
 
     page = db_session.scalar(
         select(DocumentPage).where(DocumentPage.document_id == document_id)
@@ -277,7 +313,7 @@ def test_scanned_page_uses_installed_tesseract(
     uploaded = _upload(document_context, _sample("scanned.pdf"))
     document_id = uploaded.json()["id"]
 
-    ingest_document(document_id, db_session, document_context.storage)
+    _ingest(document_id, db_session, document_context)
 
     page = db_session.scalar(
         select(DocumentPage).where(DocumentPage.document_id == document_id)
@@ -325,7 +361,7 @@ def test_document_endpoints_deny_cross_user_access(
 ) -> None:
     uploaded = _upload(document_context)
     document_id = uploaded.json()["id"]
-    ingest_document(document_id, db_session, document_context.storage)
+    _ingest(document_id, db_session, document_context)
     stranger = User(
         email="pdf-stranger@example.com",
         full_name="PDF Stranger",
@@ -354,6 +390,55 @@ def test_document_endpoints_deny_cross_user_access(
     )
 
 
+def test_reindex_replaces_vectors_only_for_the_owner(
+    document_context: DocumentTestContext,
+    db_session,
+) -> None:
+    uploaded = _upload(document_context)
+    document_id = uploaded.json()["id"]
+    _ingest(document_id, db_session, document_context)
+    old_vector_id = db_session.scalar(
+        select(Chunk.vector_id).where(Chunk.doc_id == document_id)
+    )
+    stranger = User(
+        email="reindex-stranger@example.com",
+        full_name="Reindex Stranger",
+        password_hash="unused",
+    )
+    db_session.add(stranger)
+    db_session.flush()
+    foreign_document = Document(
+        owner_id=stranger.id,
+        title="Foreign document",
+        status="ready",
+    )
+    db_session.add(foreign_document)
+    db_session.commit()
+
+    response = document_context.client.post(
+        f"/documents/{document_id}/reindex",
+        headers=document_context.headers,
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"document_id": document_id, "indexed_count": 1}
+    assert document_context.vector_store.deleted_documents == [
+        document_id,
+        document_id,
+    ]
+    assert (
+        db_session.scalar(select(Chunk.vector_id).where(Chunk.doc_id == document_id))
+        != old_vector_id
+    )
+    assert (
+        document_context.client.post(
+            f"/documents/{foreign_document.id}/reindex",
+            headers=document_context.headers,
+        ).status_code
+        == 404
+    )
+
+
 def test_delete_removes_owned_file_pages_and_future_vectors(
     document_context: DocumentTestContext,
     db_session,
@@ -361,7 +446,7 @@ def test_delete_removes_owned_file_pages_and_future_vectors(
     uploaded = _upload(document_context)
     document_id = uploaded.json()["id"]
     storage_key = db_session.get(Document, document_id).storage_key
-    ingest_document(document_id, db_session, document_context.storage)
+    _ingest(document_id, db_session, document_context)
 
     deleted = document_context.client.delete(
         f"/documents/{document_id}",
@@ -376,7 +461,10 @@ def test_delete_removes_owned_file_pages_and_future_vectors(
         )
         is None
     )
-    assert document_context.vector_store.deleted_documents == [document_id]
+    assert document_context.vector_store.deleted_documents == [
+        document_id,
+        document_id,
+    ]
     with pytest.raises(FileNotFoundError):
         document_context.storage.get(storage_key)
 

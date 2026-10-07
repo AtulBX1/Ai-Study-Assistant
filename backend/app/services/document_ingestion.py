@@ -14,7 +14,10 @@ from sqlalchemy.orm import Session
 from app.models import Document, DocumentPage, DocumentStatusEvent
 from app.nlp.preprocessing import normalize_text
 from app.services.chunking import rebuild_document_chunks
+from app.services.embeddings import EmbeddingService
 from app.services.file_storage import FileStorage
+from app.services.vector_indexing import index_document_chunks
+from app.services.vector_store import VectorStore, get_vector_store
 
 
 class InvalidPDFError(ValueError):
@@ -136,6 +139,8 @@ def ingest_document(
     document_id: int,
     db: Session,
     file_storage: FileStorage,
+    vector_store: VectorStore | None = None,
+    embedding_service: EmbeddingService | None = None,
 ) -> None:
     """Extract page text, headings, tables, and OCR into persistent page records."""
     document = db.get(Document, document_id)
@@ -212,7 +217,17 @@ def ingest_document(
                     )
 
         _record_state(db, document, "indexing", 90)
-        rebuild_document_chunks(db, document_id)
+        store = vector_store or get_vector_store()
+        store.delete_document(document_id)
+        chunks = rebuild_document_chunks(db, document_id)
+        index_document_chunks(
+            db,
+            document,
+            chunks=chunks,
+            vector_store=store,
+            embedding_service=embedding_service,
+        )
+        db.commit()
         _record_state(db, document, "ready", 100)
     except Exception as error:
         db.rollback()

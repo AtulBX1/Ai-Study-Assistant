@@ -1,2 +1,2 @@
-mode,questions,k,precision_at_k,recall_at_k,mrr,ndcg_at_k
-tfidf,30,5,0.2000000000000001,1.0,1.0,1.0
+mode,questions,k,precision_at_k,recall_at_k,mrr,ndcg_at_k,average_latency_ms
+tfidf,42,5,0.1857142857142858,0.492063492063492,0.6666666666666666,0.5312622314331414,0.6082428569373276

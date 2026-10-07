@@ -4,6 +4,10 @@ from conftest import access_token_for
 from fastapi.testclient import TestClient
 
 from app.models import Chunk, Document, DocumentPage, User
+from app.routers.documents import (
+    get_document_embedding_service,
+    get_document_vector_store,
+)
 
 
 def _headers(user_id: int) -> dict[str, str]:
@@ -136,6 +140,28 @@ def test_rechunk_endpoint_rebuilds_only_an_owned_document(
     )
     db_session.commit()
 
+    class TestVectorStore:
+        def upsert(self, collection, ids, vectors, payloads=None) -> None:
+            return None
+
+        def search(self, collection, vector, limit=5, user_id=None, document_ids=None):
+            return []
+
+        def delete_ids(self, collection, ids) -> None:
+            return None
+
+        def delete_document(self, document_id: int) -> None:
+            return None
+
+    class TestEmbeddingService:
+        def embed_texts(self, texts: list[str]) -> list[list[float]]:
+            return [[1.0, 0.0] for _ in texts]
+
+    from app.main import app
+
+    app.dependency_overrides[get_document_vector_store] = TestVectorStore
+    app.dependency_overrides[get_document_embedding_service] = TestEmbeddingService
+
     response = client.post(
         f"/documents/{own_document.id}/rechunk",
         headers=_headers(owner.id),
@@ -144,6 +170,7 @@ def test_rechunk_endpoint_rebuilds_only_an_owned_document(
 
     assert response.status_code == 200
     assert response.json()["document_id"] == own_document.id
+    assert response.json()["indexed_count"] > 0
     assert len(response.json()["chunks"]) > 1
     assert all(chunk["token_count"] <= 5 for chunk in response.json()["chunks"])
     assert (

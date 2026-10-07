@@ -43,9 +43,11 @@ from app.services.document_ingestion import (
     inspect_pdf,
     sanitize_filename,
 )
+from app.services.embeddings import EmbeddingService, get_embedding_service
 from app.services.file_storage import FileStorage, create_file_storage
 from app.services.job_queue import JobQueue, create_job_queue
-from app.services.vector_store import VectorStore, create_vector_store
+from app.services.vector_indexing import index_document_chunks
+from app.services.vector_store import VectorStore, get_vector_store
 from app.workers.document_tasks import process_document_job
 
 logger = logging.getLogger(__name__)
@@ -86,7 +88,12 @@ def get_document_job_queue(background_tasks: BackgroundTasks) -> JobQueue:
 
 def get_document_vector_store() -> VectorStore:
     """Resolve the configured vector-store adapter."""
-    return create_vector_store()
+    return get_vector_store()
+
+
+def get_document_embedding_service() -> EmbeddingService:
+    """Resolve the configured lazy sentence-embedding service."""
+    return get_embedding_service()
 
 
 def _owned_document(db: Session, document_id: int, owner_id: int) -> Document:
@@ -234,6 +241,10 @@ def rechunk_document(
     request: RechunkRequest,
     db: DatabaseSession,
     user: AuthenticatedUser,
+    vector_store: Annotated[VectorStore, Depends(get_document_vector_store)],
+    embedding_service: Annotated[
+        EmbeddingService, Depends(get_document_embedding_service)
+    ],
 ) -> dict[str, object]:
     """Rebuild an owned document's chunks with the requested boundaries."""
     _owned_document(db, document_id, user.id)
@@ -245,17 +256,26 @@ def rechunk_document(
             status_code=409,
             detail="The document has no extracted pages to rechunk.",
         )
+    vector_store.delete_document(document_id)
     chunks = rebuild_document_chunks(
         db,
         document_id,
         chunk_size=request.chunk_size,
         overlap=request.overlap,
     )
+    indexed_count = index_document_chunks(
+        db,
+        _owned_document(db, document_id, user.id),
+        chunks=chunks,
+        vector_store=vector_store,
+        embedding_service=embedding_service,
+    )
     db.commit()
     return {
         "document_id": document_id,
         "chunk_size": request.chunk_size,
         "overlap": request.overlap,
+        "indexed_count": indexed_count,
         "chunks": [
             {
                 "chunk_id": chunk.id,
@@ -270,6 +290,37 @@ def rechunk_document(
             for chunk in chunks
         ],
     }
+
+
+@router.post("/{document_id}/reindex")
+def reindex_document(
+    document_id: int,
+    db: DatabaseSession,
+    user: AuthenticatedUser,
+    vector_store: Annotated[VectorStore, Depends(get_document_vector_store)],
+    embedding_service: Annotated[
+        EmbeddingService, Depends(get_document_embedding_service)
+    ],
+) -> dict[str, int]:
+    """Replace an owned document's vector points from its persisted chunks."""
+    document = _owned_document(db, document_id, user.id)
+    has_page = db.scalar(
+        select(DocumentPage.id).where(DocumentPage.document_id == document_id).limit(1)
+    )
+    if has_page is None:
+        raise HTTPException(
+            status_code=409,
+            detail="The document has no extracted pages to reindex.",
+        )
+    vector_store.delete_document(document_id)
+    indexed_count = index_document_chunks(
+        db,
+        document,
+        vector_store=vector_store,
+        embedding_service=embedding_service,
+    )
+    db.commit()
+    return {"document_id": document_id, "indexed_count": indexed_count}
 
 
 @router.get("/{document_id}/events")

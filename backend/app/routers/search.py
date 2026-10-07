@@ -12,6 +12,8 @@ from app.core.database import get_db
 from app.dependencies.auth import get_current_user
 from app.models import Chunk, Document, User
 from app.retrieval import ChunkRecord, RetrievalResult, get_retriever
+from app.retrieval.query_processing import NoOpQueryExpander, NoOpQueryRewriter
+from app.services.reranker import get_cross_encoder_reranker
 
 router = APIRouter(tags=["search"])
 DatabaseSession = Annotated[Session, Depends(get_db)]
@@ -26,9 +28,10 @@ class SearchRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     query: str = Field(min_length=1, max_length=MAX_QUERY_LENGTH)
-    mode: Literal["tfidf", "bm25", "word2vec"] = "tfidf"
+    mode: Literal["tfidf", "bm25", "word2vec", "dense", "hybrid"] = "tfidf"
     doc_ids: list[int] | None = Field(default=None, max_length=100)
     k: int = Field(default=5, ge=1, le=MAX_SEARCH_RESULTS)
+    rerank: bool = False
 
     @field_validator("query")
     @classmethod
@@ -70,6 +73,7 @@ def _chunk_record(chunk: Chunk) -> ChunkRecord:
         page_start=chunk.page_start,
         page_end=chunk.page_end,
         section=chunk.section,
+        vector_id=chunk.vector_id,
     )
 
 
@@ -83,6 +87,11 @@ def _serialize_result(result: RetrievalResult) -> dict[str, object]:
         "page_end": result.page_end,
         "section": result.section,
         "score": result.score,
+        "original_score": (
+            result.original_score if result.original_score is not None else result.score
+        ),
+        "rerank_score": result.rerank_score,
+        "components": result.components,
         "rank": result.rank,
     }
 
@@ -96,7 +105,14 @@ def search(
     """Search only the current user's documents with a registered retriever."""
     document_ids = _owned_document_ids(db, user.id, request.doc_ids)
     if not document_ids:
-        return {"query": request.query, "mode": request.mode, "results": []}
+        return {
+            "query": request.query,
+            "rewritten_query": request.query,
+            "mode": request.mode,
+            "rerank_applied": False,
+            "rerank_error": None,
+            "results": [],
+        }
     chunks = list(
         db.scalars(
             select(Chunk)
@@ -110,9 +126,26 @@ def search(
     )
     records = [_chunk_record(chunk) for chunk in chunks]
     retriever = get_retriever(request.mode, user.id, records)
-    results = retriever.retrieve(request.query, document_ids, request.k)
+    rewritten_query = NoOpQueryRewriter().rewrite(request.query)
+    query_variants = NoOpQueryExpander().expand(rewritten_query)
+    if not query_variants or any(not query.strip() for query in query_variants):
+        raise ValueError("Query expansion must produce at least one non-empty query.")
+    candidate_limit = 30 if request.rerank else request.k
+    results = retriever.retrieve(query_variants[0], document_ids, candidate_limit)
+    rerank_applied = False
+    rerank_error = None
+    if request.rerank:
+        outcome = get_cross_encoder_reranker().rerank(
+            query_variants[0], results, request.k
+        )
+        results = outcome.results
+        rerank_applied = outcome.applied
+        rerank_error = outcome.error
     return {
         "query": request.query,
+        "rewritten_query": rewritten_query,
         "mode": request.mode,
+        "rerank_applied": rerank_applied,
+        "rerank_error": rerank_error,
         "results": [_serialize_result(result) for result in results],
     }

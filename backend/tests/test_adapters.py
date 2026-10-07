@@ -64,15 +64,41 @@ def test_local_vector_store_persists_and_searches_vectors(tmp_path: Path) -> Non
     vector_store = create_vector_store(settings)
     vector_store.upsert(
         "test-documents",
-        ["00000000-0000-0000-0000-000000000001"],
-        [[1.0, 0.0]],
-        [{"page": 1}],
+        [
+            "00000000-0000-0000-0000-000000000001",
+            "00000000-0000-0000-0000-000000000002",
+            "00000000-0000-0000-0000-000000000003",
+        ],
+        [[1.0, 0.0], [0.9, 0.1], [0.8, 0.2]],
+        [
+            {"user_id": 10, "document_id": 20, "chunk_id": 1, "page": 1},
+            {"user_id": 11, "document_id": 20, "chunk_id": 2, "page": 2},
+            {"user_id": 10, "document_id": 21, "chunk_id": 3, "page": 3},
+        ],
     )
 
     matches = vector_store.search("test-documents", [1.0, 0.0])
+    owned = vector_store.search(
+        "test-documents",
+        [1.0, 0.0],
+        user_id=10,
+        document_ids=[20],
+    )
+    foreign = vector_store.search("test-documents", [1.0, 0.0], user_id=11)
 
     assert matches[0].id == "00000000-0000-0000-0000-000000000001"
-    assert matches[0].payload == {"page": 1}
+    assert matches[0].payload == {
+        "user_id": 10,
+        "document_id": 20,
+        "chunk_id": 1,
+        "page": 1,
+    }
+    assert [match.payload["chunk_id"] for match in owned] == [1]
+    assert [match.payload["user_id"] for match in foreign] == [11]
+    vector_store.delete_document(20)
+    assert [
+        match.id for match in vector_store.search("test-documents", [1.0, 0.0])
+    ] == ["00000000-0000-0000-0000-000000000003"]
 
 
 def test_local_database_uses_sqlite_engine(tmp_path: Path) -> None:
