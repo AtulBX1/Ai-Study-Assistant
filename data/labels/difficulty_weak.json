@@ -1,0 +1,183 @@
+{
+  "source": "weak_heuristic",
+  "labels_are_weak": true,
+  "predictions_from": "models/sequence/difficulty/lstm.pt",
+  "heuristics": [
+    "Flesch reading ease",
+    "inverse document-frequency term rarity",
+    "average sentence length",
+    "technical-term suffix density"
+  ],
+  "chunks": [
+    {
+      "chunk_index": 0,
+      "page_start": 1,
+      "page_end": 21,
+      "text": "unit i: foundations of nlp natural language processing (nlp) what is it? nlp is the branch of ai concerned with giving computers the ability to understand, interpret, and generate human language in a valuable way. the core problem: humans communicate in messy, context-dependent ways. computers only understand rigid mathematics. nlp is the translator between these two worlds. applications of nlp •machine translation (google translate) •chatbots and virtual assistants (chatgpt, siri, alexa) •sentiment analysis •spam email detection •text summarization •question answering systems phase time period main approach example rule-based era 1950s–late 1980s handcrafted grammar and dictionary rules rule-based machine translation statistical nlp era 1990s–early 2010s probability and machine learning spam detection, statistical mt deep learning era <num> –present neural networks and transformers chatgpt, google translate, bert, gpt language and grammar (machines vs humans) <num> aspect humans machines (nlp systems) understanding understand meaning using context, experience, and common sense. understand text using rules, algorithms, and learned patterns from data. grammar can recognize correct grammar even with incomplete or informal sentences. depend on grammar rules or trained models; may struggle with ambiguous or incorrect sentences. context easily infer hidden meanings, emotions, sarcasm, and intent. need contextual data and models; sarcasm and implicit meaning are more difficult. learning learn naturally through interaction and experience. learn from large datasets using machine learning or deep learning. error handling can understand and correct grammatical mistakes intuitively. may misinterpret sentences if grammar is incorrect or unseen during training. flexibility adapt quickly to new words, slang, and language changes. require retraining or fine-tuning to handle new language patterns effectively. concept example <num> . language as structured communication sentence: \"the cat sat on the mat.\" grammar and syntax help identify that \"cat\" is the subject, \"sat\" is the verb, and \"on the mat\" indicates location. this allows the system to understand the sentence correctly. <num> . knowledge represents meaning",
+      "heuristics": {
+        "flesch_reading_ease": 32.3841,
+        "term_rarity": 0.9802,
+        "average_sentence_length": 14.2273,
+        "technical_term_density": 0.0543
+      },
+      "difficulty_score": 2.175,
+      "label": "medium",
+      "label_type": "weak_heuristic",
+      "predicted_label": "medium",
+      "predicted_confidence": 0.3560851216316223
+    },
+    {
+      "chunk_index": 1,
+      "page_start": 21,
+      "page_end": 37,
+      "text": "\"cat\" is the subject, \"sat\" is the verb, and \"on the mat\" indicates location. this allows the system to understand the sentence correctly. <num> . knowledge represents meaning sentence: \"apple released a new iphone.\" knowledge helps identify that apple refers to the technology company, not the fruit, based on context. <num> . symbolic approaches used explicit knowledge a rule-based grammar checker may use the rule: \"a singular subject must take a singular verb.\" it flags the sentence \"she go to school.\" and corrects it to \"she goes to school.\" <num> . statistical and neural models learn implicit knowledge a transformer model like gpt learns from millions of sentences that after \"the capital of france is...\", the most likely next word is \"paris\", without being explicitly programmed with this rule. <num> . integration of language and knowledge boosts understanding question: \"who wrote harry potter?\" a language model combined with external knowledge can accurately answer \"j.k. rowling\" and even provide related information such as the publication year or book series. where morphology is used (real applications) <num> common stemming algorithms • porter stemmer: standard and widely used rule-based stemmer with good accuracy. • snowball stemmer: improved version of porter; more accurate and supports multiple languages. • lancaster stemmer: fastest and most aggressive stemmer, but it may over-stem words and reduce readability. original word porter stemmer snowball stemmer lancaster stemmer playing play play play studying studi studi study happiness happi happi happy organization organ organ org generalization gener general gen maximum maximum maximum maxim <num> ambiguity <num> .words and sentences have multiple meanings <num> .context determines intended meaning in language <num> .duck sentence shows lexical ambiguity clearly <num> .parser must infer meaning from context context <num> .context crucial for correct sentence interpretation <num> .complex sentences make context extraction difficult <num> .sandwich sentence lacks sufficient information alone <num> .additional context enables correct inference here idioms and metaphors <num> .idioms and metaphors challenge literal understanding <num> .meanings differ from words literal sense",
+      "heuristics": {
+        "flesch_reading_ease": 26.9394,
+        "term_rarity": 0.9793,
+        "average_sentence_length": 23.1429,
+        "technical_term_density": 0.0741
+      },
+      "difficulty_score": 2.5107,
+      "label": "hard",
+      "label_type": "weak_heuristic",
+      "predicted_label": "easy",
+      "predicted_confidence": 0.35046350955963135
+    },
+    {
+      "chunk_index": 2,
+      "page_start": 37,
+      "page_end": 50,
+      "text": "difficult <num> .sandwich sentence lacks sufficient information alone <num> .additional context enables correct inference here idioms and metaphors <num> .idioms and metaphors challenge literal understanding <num> .meanings differ from words literal sense <num> .cultural context required for correct interpretation named entity recognition <num> .ner identifies and classifies named entities <num> .entities include people organizations locations others <num> .ambiguity makes entity meaning selection difficult <num> .correct entities crucial for nlp applications mcq practice • a student tells a computer, “move the red block onto the blue block.” the computer identifies both blocks, understands their positions, and moves the red block. which system demonstrated this type of interaction? a. eliza b. parry c. shrdlu d. word2vec mcq practice c. shrdlu mcq practice researchers in the 1950s attempted to make computers translate russian text into english automatically. which major area of nlp did this early work contribute to? a. machine translation b. speech synthesis c. sentiment analysis d. text classification mcq practice a. machine translation mcq practice • an nlp system receives the words “unhappy,” “happiness,” and “happily.” it analyzes how these words are constructed from smaller meaningful units. which area of nlp is involved? a. morphology b. phonetics c. machine translation d. speech recognition mcq practice a. morphology mcq practice • an nlp system processes the words “cat,” “cats,” “walk,” and “walked.” it notices that the words change to express grammatical information such as number or tense. which type of morphology is involved? a. derivational morphology b. inflectional morphology c. lexical morphology d. syntactic morphology mcq practice b. inflectional morphology mcq practice • consider the following changes: • cat → cats • happy → happiness which statement is correct? a. both are inflectional b. both are derivational c. cat → cats is inflectional and happy → happiness is derivational d. cat → cats is derivational and happy → happiness is inflectional mcq practice c. cat → cats is inflectional and happy → happiness is derivational mcq practice",
+      "heuristics": {
+        "flesch_reading_ease": 34.0565,
+        "term_rarity": 0.9248,
+        "average_sentence_length": 8.8857,
+        "technical_term_density": 0.0804
+      },
+      "difficulty_score": 2.0475,
+      "label": "easy",
+      "label_type": "weak_heuristic",
+      "predicted_label": "easy",
+      "predicted_confidence": 0.38331282138824463
+    },
+    {
+      "chunk_index": 3,
+      "page_start": 48,
+      "page_end": 83,
+      "text": "d. cat → cats is derivational and happy → happiness is inflectional mcq practice c. cat → cats is inflectional and happy → happiness is derivational mcq practice • an nlp system sees the sentence: “the children played in the park.” it identifies that children expresses plural meaning and played expresses past tense. which type of morphology is mainly involved? a. derivational morphology b. inflectional morphology c. both are derivational d. neither involves morphology mcq practice b. inflectional morphology tokenization step <num> : calculate document frequency (df) for each bigram df is the number of documents (sentences) that contain the bigram. i. good movie appears in <num> documents: sentence <num> and sentence <num> . so, df = <num> . ii. not a appears in <num> document: sentence <num> . so, df = <num> . iii. a good appears in <num> document: sentence <num> . so, df = <num> . iv. did not appears in <num> document: sentence <num> . so, df = <num> . v. not like appears in <num> document: sentence <num> . so, df = <num> stop-word removal stop-words :very frequent words that carry little semantic meaning. example: is, am, are, the, a, an, in, on, at, of, for, and why remove them? because: •they do not help classification much •they increase dimensionality •they add noise •they slow down models sentence: \"this is a very good movie\" after stop-word removal: \"good movie\" advantages ✔reduces vocabulary size ✔faster training ✔less noise tasks that require preserving stopwords: •machine translation (maintains grammatical structure) •text summarization (preserves sentence coherence) •question-answering systems (syntactic relationships matter) •grammar checking and parsing aspect details normalization handle case differences and contractions (e.g., \"do not\", \"the\") language specificity use stopword lists tailored to each language context risk important words like \"not\" or prepositions may be needed for meaning signal vs. noise",
+      "heuristics": {
+        "flesch_reading_ease": 49.8138,
+        "term_rarity": 0.8404,
+        "average_sentence_length": 10.2857,
+        "technical_term_density": 0.0799
+      },
+      "difficulty_score": 1.839,
+      "label": "easy",
+      "label_type": "weak_heuristic",
+      "predicted_label": "easy",
+      "predicted_confidence": 0.4134555459022522
+    },
+    {
+      "chunk_index": 4,
+      "page_start": 83,
+      "page_end": 92,
+      "text": "language specificity use stopword lists tailored to each language context risk important words like \"not\" or prepositions may be needed for meaning signal vs. noise too much removal = loss of signal or too little = extra noise task sensitivity helps in classification but may hurt tasks needing deeper understanding categories of stopwords it helps in making informed decisions: •standard stopwords: articles (\"a\", \"the\"), conjunctions (\"and\", \"but\") and prepositions (\"in\", \"on\") •domain-specific stopwords: context-dependent terms that appear frequently in specific fields like \"patient\" in medical texts •contextual stopwords: words with extremely high frequency in particular datasets •numerical stopwords: digits, punctuation marks and single characters punctuation removal •punctuation removal means eliminating symbols like: • . , ! ? ; : \" ' ( ) •commonly done using nltk (natural language toolkit) in python why do we remove punctuation? <num> . reduces noise in data punctuation usually does not add meaning acts as unnecessary noise for ml models example: \"hello!\" → \"hello\" <num> . simplifies text processing helps in cleaner tokenization prevents creation of multiple forms of same word example: \"word\" and \"word.\" → treated as same after cleaning <num> . improves model accuracy models focus on important words avoids confusion caused by punctuation improves: sentiment analysis, topic modelling, text classification <num> . reduces vocabulary size prevents unnecessary tokens makes models: faster, more memory-efficient, easier to train <num> . helps in better word matching important for: search engines, chatbots, information retrieval systems ensures consistent comparison between text and training data 🔹example before punctuation removal: \"this movie is amazing!\" after punctuation removal: this movie is amazing nlp's quantum leap: from n-grams to gpt- <num> what is the main purpose of text preprocessing in nlp? a. to increase sentence length b. to convert text into numerical form c. to improve grammar d. to translate text correct answer: b machine learning models work with numbers, so",
+      "heuristics": {
+        "flesch_reading_ease": 30.3921,
+        "term_rarity": 0.8426,
+        "average_sentence_length": 18.4375,
+        "technical_term_density": 0.0576
+      },
+      "difficulty_score": 2.1725,
+      "label": "medium",
+      "label_type": "weak_heuristic",
+      "predicted_label": "easy",
+      "predicted_confidence": 0.3633773624897003
+    },
+    {
+      "chunk_index": 5,
+      "page_start": 92,
+      "page_end": 99,
+      "text": "in nlp? a. to increase sentence length b. to convert text into numerical form c. to improve grammar d. to translate text correct answer: b machine learning models work with numbers, so text must be converted into numerical form. quiz which of the following is true about bag of words (bow)? a. it preserves word order b. it understands grammar c. it counts word frequency d. it captures word meaning correct answer: c bow represents text using word counts and ignores grammar and order. what is an n-gram? a. a random group of words b. a sequence of n consecutive words or characters c. a type of neural network d. a stop-word list correct answer: b an n-gram is a continuous sequence of n items from text. which of the following is an advantage of n- grams over bag of words? a. requires less memory b. ignores word order c. captures context and word order d. reduces vocabulary size correct answer: c n-grams preserve word sequence, which helps capture context. what is an out-of-vocabulary (oov) word? a. a frequently used word b. a word removed during preprocessing c. a word not present in training data d. a stop-word correct answer: c oov words are unseen words that were not present in the training vocabulary. why is punctuation removal done in nlp? a. to improve grammar b. to reduce noise and simplify text c. to increase accuracy of spelling d. to increase sentence length correct answer: b punctuation usually does not contribute to meaning and increases data complexity. nlp preprocessing pipeline (google colab) ✔covers: ✔tokenization ✔lowercasing ✔noise removal ✔stopword removal ✔stemming & lemmatization ✔bag-of-words ✔tf–idf ✔uses tensorflow / keras compatible tools lab1: given a set of text documents, implement a preprocessing pipeline that performs: tokenization lowercasing noise removal stopword removal stemming/lemmatization converts the processed text into numerical representations using",
+      "heuristics": {
+        "flesch_reading_ease": 56.4272,
+        "term_rarity": 0.6586,
+        "average_sentence_length": 8.5676,
+        "technical_term_density": 0.0379
+      },
+      "difficulty_score": 1.4221,
+      "label": "easy",
+      "label_type": "weak_heuristic",
+      "predicted_label": "easy",
+      "predicted_confidence": 0.3415641486644745
+    },
+    {
+      "chunk_index": 6,
+      "page_start": 98,
+      "page_end": 102,
+      "text": "✔uses tensorflow / keras compatible tools lab1: given a set of text documents, implement a preprocessing pipeline that performs: tokenization lowercasing noise removal stopword removal stemming/lemmatization converts the processed text into numerical representations using bag-of-words and tf-idf install & import libraries # install required libraries (run once in colab) !pip install nltk scikit-learn import re import nltk import string from nltk.corpus import stopwords from nltk.tokenize import word_tokenize from nltk.stem import porterstemmer, wordnetlemmatizer from sklearn.feature_extraction.text import countvectorizer, tfidfvectorizer •pip is python's package manager •nltk → natural language toolkit (classical nlp tasks) •scikit-learn → converts text into numerical features •colab does not come with all libraries → we install them manually •re → regular expressions (pattern-based text cleaning) •nltk → tokenization, stopwords, stemming, lemmatization •string → contains predefined punctuation symbols •stopwords → common words like is, the, and •word_tokenize → splits sentence into words •porterstemmer → reduces words to root form •wordnetlemmatizer → converts words to dictionary form •countvectorizer → bag-of-words •tfidfvectorizer → tf-idf representation download nltk resources nltk.download('punkt') nltk.download('stopwords') nltk.download('wordnet') nltk.download('omw- <num> ') explaination: •nltk does not ship data by default •punkt → tokenizer model •stopwords → stopword list •wordnet → lexical database for lemmatization •omw → improves lemmatizer accuracy input text documents documents = [ \"natural language processing is a fascinating field of ai!\", \"text preprocessing includes tokenization, stemming, and lemmatization.\", \"machine learning models require numerical input, not raw text.\" ] explaination: •this is a corpus (collection of documents) •each sentence is treated as one document •real datasets come from files, csvs, or databases initialize nlp tools stop_words = set(stopwords.words('english')) •loads english stopwords",
+      "heuristics": {
+        "flesch_reading_ease": -233.5747,
+        "term_rarity": 0.9024,
+        "average_sentence_length": 265.0,
+        "technical_term_density": 0.0566
+      },
+      "difficulty_score": 11.0329,
+      "label": "hard",
+      "label_type": "weak_heuristic",
+      "predicted_label": "easy",
+      "predicted_confidence": 0.3714311718940735
+    },
+    {
+      "chunk_index": 7,
+      "page_start": 101,
+      "page_end": 105,
+      "text": "•each sentence is treated as one document •real datasets come from files, csvs, or databases initialize nlp tools stop_words = set(stopwords.words('english')) •loads english stopwords •converted to set → faster lookup than list stemmer = porterstemmer() •creates a stemming object •example: running → run lemmatizer = wordnetlemmatizer() •creates lemmatizer object •example: better → good define preprocessing function def preprocess_text(text): •function processes one document at a time •reusable for entire corpus lowercasing text = text.lower() •converts all text to lowercase •avoids treating ai and ai as different words noise removal text = re.sub(r'\\d+', '', text) •removes numbers •\\d+ → one or more digits text = text.translate(str.maketrans('', '', string.punctuation)) •removes punctuation symbols like .,!? •keeps only meaningful text tokenization tokens = word_tokenize(text) •splits sentence into words •example: \"nlp is fun\" → ['nlp', 'is', 'fun'] stopword removal tokens = [word for word in tokens if word not in stop_words] •removes words that add little meaning •reduces dimensionality •improves model focus stemming stemmed_tokens = [stemmer.stem(word) for word in tokens] •cuts words to root form •fast but not linguistically perfect lemmatization lemmatized_tokens = [lemmatizer.lemmatize(word) for word in stemmed_tokens] •converts word to valid dictionary word •more meaningful than stemming •slower but accurate join tokens back return ' '.join(lemmatized_tokens) •converts list of words back into sentence •required by countvectorizer and tfidfvectorizer apply preprocessing to all documents processed_documents = [preprocess_text(doc) for doc in documents] •applies preprocessing function to every document •output → clean corpus for i, doc in enumerate(processed_documents): print(f\"processed document {i+ <num> }: {doc}\") •displays cleaned text",
+      "heuristics": {
+        "flesch_reading_ease": -79.8988,
+        "term_rarity": 0.821,
+        "average_sentence_length": 124.5,
+        "technical_term_density": 0.0442
+      },
+      "difficulty_score": 5.865,
+      "label": "hard",
+      "label_type": "weak_heuristic",
+      "predicted_label": "medium",
+      "predicted_confidence": 0.34262487292289734
+    },
+    {
+      "chunk_index": 8,
+      "page_start": 105,
+      "page_end": 111,
+      "text": "•output → clean corpus for i, doc in enumerate(processed_documents): print(f\"processed document {i+ <num> }: {doc}\") •displays cleaned text •useful for debugging and teaching bag-of-words (bow) bow_vectorizer = countvectorizer() •initializes bow model bow_features = bow_vectorizer.fit_transform(processed_documents) •fit → builds vocabulary •transform → converts text into vectors bow_vectorizer.get_feature_names_out() •displays vocabulary (columns) bow_features.toarray() •rows → documents •columns → word frequency tf-idf representation tfidf_vectorizer = tfidfvectorizer() •initializes tf-idf model tfidf_features = tfidf_vectorizer.fit_transform(processed_documents) •weighs words by importance, not just frequency tfidf_features.toarray() •values between <num> and <num> •rare but important words get higher weight quiz what is the effect of the line text = re.sub(r'\\d+', '', text) in the preprocessing pipeline? a. removes all punctuation symbols b. replaces digits with whitespace c. removes all numeric characters from the text d. converts digits into words correct answer: c the regex \\d+ matches one or more digits and removes them completely. quiz which of the following best explains why stopwords are stored as a set? stop_words = set(stopwords.words('english')) a. sets preserve word order b. sets allow duplicate stopwords c. sets provide faster membership checking d. sets reduce memory usage automatically correct answer: c checking word in stop_words is faster in a set than in a list. quiz in the code, stemming is applied before lemmatization: stemmed_tokens = [stemmer.stem(word) for word in tokens] lemmatized_tokens = [lemmatizer.lemmatize(word) for word in stemmed_tokens] what is the main drawback of this order? a. it increases computational cost b. lemmatization may receive non-dictionary words c. stemming becomes linguistically accurate d. stopword removal becomes ineffective correct answer: b explanation: stemming can produce invalid roots, reducing lemmatization effectiveness. quiz",
+      "heuristics": {
+        "flesch_reading_ease": 23.7265,
+        "term_rarity": 0.8517,
+        "average_sentence_length": 14.3158,
+        "technical_term_density": 0.0257
+      },
+      "difficulty_score": 2.0496,
+      "label": "medium",
+      "label_type": "weak_heuristic",
+      "predicted_label": "medium",
+      "predicted_confidence": 0.36288580298423767
+    },
+    {
+      "chunk_index": 9,
+      "page_start": 110,
+      "page_end": 114,
+      "text": "b. lemmatization may receive non-dictionary words c. stemming becomes linguistically accurate d. stopword removal becomes ineffective correct answer: b explanation: stemming can produce invalid roots, reducing lemmatization effectiveness. quiz what does each row in the bag-of-words matrix represent? bow_features.toarray() a. a unique word in the corpus b. a document represented as word frequencies c. a stopword vector d. a tf-idf weight vector correct answer: b rows correspond to documents; columns correspond to vocabulary terms. quiz why does tf-idf assign lower weight to commonly occurring words? a. because such words are removed as stopwords b. because tf-idf ignores word frequency c. because frequent words have low discriminative power d. because tf-idf uses binary features correct answer: c tf-idf penalizes common words since they contribute less to distinguishing documents. quiz in the preprocessing function, why is the line text = text.lower() applied before tokenization? a. to reduce the size of the stopword list b. to ensure that words like “ai” and “ai” are treated as the same token c. to improve stemming accuracy only d. to remove punctuation automatically correct answer: b lowercasing avoids duplicate tokens caused by case differences, reducing vocabulary size. references <num> . l <num> nlp basics( tokenization, stemming, lemmatization, stopwords) <num> . natural language processing (prof. pawan goyal, iit kharagpur): lecture <num> - pcfgs - inside-outside probabilities <num> . text analytics concepts: tf-idf, bag-of-words explained with examples",
+      "heuristics": {
+        "flesch_reading_ease": 40.8623,
+        "term_rarity": 0.7906,
+        "average_sentence_length": 8.7778,
+        "technical_term_density": 0.0422
+      },
+      "difficulty_score": 1.728,
+      "label": "easy",
+      "label_type": "weak_heuristic",
+      "predicted_label": "medium",
+      "predicted_confidence": 0.34282374382019043
+    }
+  ]
+}

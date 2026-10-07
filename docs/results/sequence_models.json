@@ -1,0 +1,390 @@
+[
+  {
+    "architecture": "rnn",
+    "task": "sentiment",
+    "metrics": {
+      "accuracy": 0.748,
+      "precision": 0.7477519026989199,
+      "recall": 0.7474105779579986,
+      "macro_f1": 0.7475331888662137,
+      "confusion_matrix": [
+        [
+          791,
+          244
+        ],
+        [
+          260,
+          705
+        ]
+      ],
+      "per_class": [
+        {
+          "precision": 0.7526165556612749,
+          "recall": 0.7642512077294686,
+          "f1": 0.7583892617449665
+        },
+        {
+          "precision": 0.7428872497365648,
+          "recall": 0.7305699481865285,
+          "f1": 0.7366771159874609
+        }
+      ]
+    },
+    "training_seconds": 118.2899436999578,
+    "parameter_count": 2010754,
+    "peak_vram_gib": 0.07140350341796875,
+    "gpu_utilization_peak_percent": 43.0,
+    "batch_size": 64,
+    "eval_batch_size": 8,
+    "embedding_init": "scratch",
+    "history": [
+      {
+        "epoch": 1.0,
+        "train_loss": 0.6875381958007812,
+        "validation_loss": 0.6578992919921876,
+        "training_seconds": 14.727894800016657,
+        "peak_vram_gib": 0.06669378280639648,
+        "gpu_utilization_percent": 39.0
+      },
+      {
+        "epoch": 2.0,
+        "train_loss": 0.6316974365234375,
+        "validation_loss": 0.6463153686523437,
+        "training_seconds": 14.577326400089078,
+        "peak_vram_gib": 0.06623268127441406,
+        "gpu_utilization_percent": 39.0
+      },
+      {
+        "epoch": 3.0,
+        "train_loss": 0.5839214172363282,
+        "validation_loss": 0.5967156372070312,
+        "training_seconds": 14.419221200048923,
+        "peak_vram_gib": 0.06681585311889648,
+        "gpu_utilization_percent": 40.0
+      },
+      {
+        "epoch": 4.0,
+        "train_loss": 0.5392130157470704,
+        "validation_loss": 0.5927206115722656,
+        "training_seconds": 14.824357299949042,
+        "peak_vram_gib": 0.06660938262939453,
+        "gpu_utilization_percent": 36.0
+      },
+      {
+        "epoch": 5.0,
+        "train_loss": 0.5051045196533203,
+        "validation_loss": 0.5733445739746094,
+        "training_seconds": 14.769977500080131,
+        "peak_vram_gib": 0.06666994094848633,
+        "gpu_utilization_percent": 38.0
+      },
+      {
+        "epoch": 6.0,
+        "train_loss": 0.4606938934326172,
+        "validation_loss": 0.550053695678711,
+        "training_seconds": 14.813570800004527,
+        "peak_vram_gib": 0.06711149215698242,
+        "gpu_utilization_percent": 40.0
+      },
+      {
+        "epoch": 7.0,
+        "train_loss": 0.41974058380126955,
+        "validation_loss": 0.5750768280029297,
+        "training_seconds": 14.89425539993681,
+        "peak_vram_gib": 0.06686067581176758,
+        "gpu_utilization_percent": 43.0
+      },
+      {
+        "epoch": 8.0,
+        "train_loss": 0.39103448066711427,
+        "validation_loss": 0.5712838439941407,
+        "training_seconds": 14.91283809999004,
+        "peak_vram_gib": 0.06667613983154297,
+        "gpu_utilization_percent": 39.0
+      }
+    ],
+    "artifact": "D:\\Semester5\\CSE472\\PDF_BASED LEARNING\\models\\sequence\\sentiment\\rnn.pt",
+    "loss_figure": "rnn_loss_seq400.png"
+  },
+  {
+    "architecture": "lstm",
+    "task": "sentiment",
+    "metrics": {
+      "accuracy": 0.817,
+      "precision": 0.8171380397639485,
+      "recall": 0.8175114515281219,
+      "macro_f1": 0.8169641249684938,
+      "confusion_matrix": [
+        [
+          831,
+          204
+        ],
+        [
+          162,
+          803
+        ]
+      ],
+      "per_class": [
+        {
+          "precision": 0.8368580060422961,
+          "recall": 0.8028985507246377,
+          "f1": 0.819526627218935
+        },
+        {
+          "precision": 0.7974180734856008,
+          "recall": 0.8321243523316062,
+          "f1": 0.8144016227180526
+        }
+      ]
+    },
+    "training_seconds": 85.71047890000045,
+    "parameter_count": 2042626,
+    "peak_vram_gib": 0.07968282699584961,
+    "gpu_utilization_peak_percent": 37.0,
+    "batch_size": 64,
+    "eval_batch_size": 8,
+    "embedding_init": "scratch",
+    "history": [
+      {
+        "epoch": 1.0,
+        "train_loss": 0.6639221618652343,
+        "validation_loss": 0.6035654296875,
+        "training_seconds": 16.290827900054865,
+        "peak_vram_gib": 0.07836341857910156,
+        "gpu_utilization_percent": 35.0
+      },
+      {
+        "epoch": 2.0,
+        "train_loss": 0.5112786643981934,
+        "validation_loss": 0.5048109436035156,
+        "training_seconds": 17.467611499945633,
+        "peak_vram_gib": 0.07968282699584961,
+        "gpu_utilization_percent": 36.0
+      },
+      {
+        "epoch": 3.0,
+        "train_loss": 0.420597015953064,
+        "validation_loss": 0.4454289855957031,
+        "training_seconds": 19.341878499952145,
+        "peak_vram_gib": 0.07797527313232422,
+        "gpu_utilization_percent": 37.0
+      },
+      {
+        "epoch": 4.0,
+        "train_loss": 0.3507017169952393,
+        "validation_loss": 0.4593291969299316,
+        "training_seconds": 16.769515799940564,
+        "peak_vram_gib": 0.07774782180786133,
+        "gpu_utilization_percent": 35.0
+      },
+      {
+        "epoch": 5.0,
+        "train_loss": 0.2962370869636536,
+        "validation_loss": 0.45907646560668947,
+        "training_seconds": 15.60058620001655,
+        "peak_vram_gib": 0.07786750793457031,
+        "gpu_utilization_percent": 33.0
+      }
+    ],
+    "artifact": "D:\\Semester5\\CSE472\\PDF_BASED LEARNING\\models\\sequence\\sentiment\\lstm.pt",
+    "loss_figure": "lstm_loss_seq400.png"
+  },
+  {
+    "architecture": "gru",
+    "task": "sentiment",
+    "metrics": {
+      "accuracy": 0.8655,
+      "precision": 0.8653037733960565,
+      "recall": 0.8654226427373533,
+      "macro_f1": 0.8653577841595184,
+      "confusion_matrix": [
+        [
+          898,
+          137
+        ],
+        [
+          132,
+          833
+        ]
+      ],
+      "per_class": [
+        {
+          "precision": 0.8718446601941747,
+          "recall": 0.8676328502415459,
+          "f1": 0.8697336561743341
+        },
+        {
+          "precision": 0.8587628865979381,
+          "recall": 0.8632124352331606,
+          "f1": 0.8609819121447028
+        }
+      ]
+    },
+    "training_seconds": 124.00216699996963,
+    "parameter_count": 2032002,
+    "peak_vram_gib": 0.0789804458618164,
+    "gpu_utilization_peak_percent": 36.0,
+    "batch_size": 64,
+    "eval_batch_size": 8,
+    "embedding_init": "scratch",
+    "history": [
+      {
+        "epoch": 1.0,
+        "train_loss": 0.6592274200439453,
+        "validation_loss": 0.623791015625,
+        "training_seconds": 15.622816800023429,
+        "peak_vram_gib": 0.07727289199829102,
+        "gpu_utilization_percent": 36.0
+      },
+      {
+        "epoch": 2.0,
+        "train_loss": 0.49751215286254885,
+        "validation_loss": 0.5565024566650391,
+        "training_seconds": 15.352977599948645,
+        "peak_vram_gib": 0.0789337158203125,
+        "gpu_utilization_percent": 34.0
+      },
+      {
+        "epoch": 3.0,
+        "train_loss": 0.3759937856674194,
+        "validation_loss": 0.41119254302978514,
+        "training_seconds": 15.464960600016639,
+        "peak_vram_gib": 0.0789804458618164,
+        "gpu_utilization_percent": 33.0
+      },
+      {
+        "epoch": 4.0,
+        "train_loss": 0.2883237988471985,
+        "validation_loss": 0.4413228464126587,
+        "training_seconds": 16.170772499986924,
+        "peak_vram_gib": 0.0787816047668457,
+        "gpu_utilization_percent": 35.0
+      },
+      {
+        "epoch": 5.0,
+        "train_loss": 0.2222155133008957,
+        "validation_loss": 0.3989903144836426,
+        "training_seconds": 14.974978500045836,
+        "peak_vram_gib": 0.07879257202148438,
+        "gpu_utilization_percent": 31.0
+      },
+      {
+        "epoch": 6.0,
+        "train_loss": 0.16243934271335603,
+        "validation_loss": 0.347724169254303,
+        "training_seconds": 14.950155300088227,
+        "peak_vram_gib": 0.07876014709472656,
+        "gpu_utilization_percent": 34.0
+      },
+      {
+        "epoch": 7.0,
+        "train_loss": 0.1191683955848217,
+        "validation_loss": 0.4076575939655304,
+        "training_seconds": 15.344333700020798,
+        "peak_vram_gib": 0.0775918960571289,
+        "gpu_utilization_percent": 36.0
+      },
+      {
+        "epoch": 8.0,
+        "train_loss": 0.08434701098799706,
+        "validation_loss": 0.5106929450035095,
+        "training_seconds": 15.763832399970852,
+        "peak_vram_gib": 0.07891035079956055,
+        "gpu_utilization_percent": 35.0
+      }
+    ],
+    "artifact": "D:\\Semester5\\CSE472\\PDF_BASED LEARNING\\models\\sequence\\sentiment\\gru.pt",
+    "loss_figure": "gru_loss_seq400.png"
+  },
+  {
+    "architecture": "bilstm",
+    "task": "sentiment",
+    "metrics": {
+      "accuracy": 0.835,
+      "precision": 0.835332808979509,
+      "recall": 0.8342369402518084,
+      "macro_f1": 0.8345697158308761,
+      "confusion_matrix": [
+        [
+          886,
+          149
+        ],
+        [
+          181,
+          784
+        ]
+      ],
+      "per_class": [
+        {
+          "precision": 0.8303655107778819,
+          "recall": 0.8560386473429952,
+          "f1": 0.8430066603235015
+        },
+        {
+          "precision": 0.8403001071811361,
+          "recall": 0.8124352331606217,
+          "f1": 0.8261327713382508
+        }
+      ]
+    },
+    "training_seconds": 159.64042000006884,
+    "parameter_count": 2085250,
+    "peak_vram_gib": 0.11956548690795898,
+    "gpu_utilization_peak_percent": 39.0,
+    "batch_size": 64,
+    "eval_batch_size": 8,
+    "embedding_init": "scratch",
+    "history": [
+      {
+        "epoch": 1.0,
+        "train_loss": 0.6335611312866211,
+        "validation_loss": 0.6854580841064453,
+        "training_seconds": 26.458728799945675,
+        "peak_vram_gib": 0.11956548690795898,
+        "gpu_utilization_percent": 36.0
+      },
+      {
+        "epoch": 2.0,
+        "train_loss": 0.4727994895935059,
+        "validation_loss": 0.47051182174682615,
+        "training_seconds": 27.826714399969205,
+        "peak_vram_gib": 0.11942672729492188,
+        "gpu_utilization_percent": 36.0
+      },
+      {
+        "epoch": 3.0,
+        "train_loss": 0.36893641328811644,
+        "validation_loss": 0.42651078701019285,
+        "training_seconds": 27.267281400039792,
+        "peak_vram_gib": 0.11858463287353516,
+        "gpu_utilization_percent": 39.0
+      },
+      {
+        "epoch": 4.0,
+        "train_loss": 0.2845945004940033,
+        "validation_loss": 0.3995014591217041,
+        "training_seconds": 26.09508639993146,
+        "peak_vram_gib": 0.11825180053710938,
+        "gpu_utilization_percent": 36.0
+      },
+      {
+        "epoch": 5.0,
+        "train_loss": 0.22206210715770722,
+        "validation_loss": 0.4017961111068726,
+        "training_seconds": 25.71991360001266,
+        "peak_vram_gib": 0.11882877349853516,
+        "gpu_utilization_percent": 36.0
+      },
+      {
+        "epoch": 6.0,
+        "train_loss": 0.16926101098060609,
+        "validation_loss": 0.4250749773979187,
+        "training_seconds": 25.966892500058748,
+        "peak_vram_gib": 0.11910390853881836,
+        "gpu_utilization_percent": 35.0
+      }
+    ],
+    "artifact": "D:\\Semester5\\CSE472\\PDF_BASED LEARNING\\models\\sequence\\sentiment\\bilstm.pt",
+    "loss_figure": "bilstm_loss_seq400.png"
+  }
+]

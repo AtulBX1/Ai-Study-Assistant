@@ -1,9 +1,9 @@
 # AI Study Assistant
 
 A syllabus-aligned study assistant for asking questions about course PDFs and
-generating quizzes. The repository is being built incrementally; this scaffold
-sets up the development environment without implementing authentication,
-application database models, PDF ingestion, or NLP/ML features.
+generating quizzes. The repository is built incrementally and includes
+authenticated document ingestion, retrieval, classic embeddings, and recurrent
+sequence-model experiments.
 
 ## Requirements
 
@@ -74,3 +74,20 @@ npm test
 See [the scaffold learning note](docs/learn/01-scaffold.md) for an overview and
 viva questions. Project-wide instructions are in
 `.github/copilot-instructions.md`.
+
+## Sequence-model experiments
+
+Run these from the repository root after installing the backend environment.
+The local configuration is sized for a 4 GiB GPU; use `configs/dgx.yaml` instead
+only on a larger GPU.
+
+```powershell
+backend\.venv\Scripts\python.exe ml\sequence_models\compare_models.py --config configs\local_4gb.yaml
+backend\.venv\Scripts\python.exe ml\sequence_models\train_difficulty.py --config configs\local_4gb.yaml
+backend\.venv\Scripts\python.exe ml\sequence_models\train_generation.py --config configs\local_4gb.yaml
+```
+
+The IMDB dataset cache is stored in `data/hf_cache`; trained weights are stored
+under `models/sequence`. See the
+[Step 8 learning note](docs/learn/08-sequence-models.md) and
+[comparison results](docs/results/sequence_models.md).

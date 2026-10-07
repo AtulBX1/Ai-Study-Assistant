@@ -1,6 +1,8 @@
 """Authenticated preprocessing lab endpoints."""
 
-from typing import Annotated, Any, Literal
+import sys
+from pathlib import Path
+from typing import TYPE_CHECKING, Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -36,6 +38,40 @@ from app.retrieval.registry import invalidate_retriever_cache
 router = APIRouter(prefix="/lab", tags=["preprocessing lab"])
 DatabaseSession = Annotated[Session, Depends(get_db)]
 AuthenticatedUser = Annotated[User, Depends(get_current_user)]
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+
+if TYPE_CHECKING:
+    from ml.sequence_models.inference import SequencePredictor
+
+
+def _sequence_predictor(
+    task: Literal["sentiment", "difficulty"],
+    architecture: Literal["rnn", "lstm", "gru", "bilstm"],
+) -> "SequencePredictor":
+    """Load a trained model only when a lab prediction is requested."""
+    if str(PROJECT_ROOT) not in sys.path:
+        sys.path.insert(0, str(PROJECT_ROOT))
+    from ml.sequence_models.inference import get_predictor
+
+    return get_predictor(task, architecture)
+
+
+class ClassifyRequest(BaseModel):
+    """Bounded text and a supported task/architecture for sequence inference."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    text: str = Field(min_length=1, max_length=MAX_INPUT_CHARS)
+    task: Literal["sentiment", "difficulty"]
+    model: Literal["rnn", "lstm", "gru", "bilstm"]
+
+
+class DifficultyBatchRequest(BaseModel):
+    """An owner-scoped document ID whose chunks should be difficulty-tagged."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    document_id: int = Field(gt=0)
 
 
 class PreprocessRequest(BaseModel):
@@ -138,6 +174,75 @@ def preprocess(
         "language": detect_language(text),
         "pages": page_numbers,
         "steps": output,
+    }
+
+
+@router.post("/classify")
+def classify_text(
+    request: ClassifyRequest,
+    user: AuthenticatedUser,
+) -> dict[str, Any]:
+    """Classify text with the requested locally trained recurrent model."""
+    try:
+        prediction = _sequence_predictor(request.task, request.model).predict(
+            request.text
+        )
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+    return {
+        "task": request.task,
+        "model": request.model,
+        **prediction,
+    }
+
+
+@router.post("/difficulty/batch")
+def classify_document_chunks(
+    request: DifficultyBatchRequest,
+    db: DatabaseSession,
+    user: AuthenticatedUser,
+) -> dict[str, Any]:
+    """Tag every chunk in an owned document with the saved difficulty classifier."""
+    document = db.scalar(
+        select(Document).where(
+            Document.id == request.document_id,
+            Document.owner_id == user.id,
+        )
+    )
+    if document is None:
+        raise HTTPException(status_code=404, detail="Document not found.")
+    chunks = list(
+        db.scalars(
+            select(Chunk)
+            .where(Chunk.doc_id == request.document_id)
+            .order_by(Chunk.chunk_index, Chunk.id)
+        )
+    )
+    if not chunks:
+        raise HTTPException(status_code=409, detail="The document has no chunks.")
+    try:
+        predictor = _sequence_predictor("difficulty", "lstm")
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+    tagged: list[dict[str, Any]] = []
+    for chunk in chunks:
+        prediction = predictor.predict(chunk.text)
+        chunk.difficulty_label = prediction["label"]
+        chunk.difficulty_confidence = prediction["confidence"]
+        chunk.difficulty_model = "lstm"
+        tagged.append(
+            {
+                "chunk_id": chunk.id,
+                "label": prediction["label"],
+                "confidence": prediction["confidence"],
+            }
+        )
+    db.commit()
+    return {
+        "document_id": request.document_id,
+        "tagged_chunks": len(tagged),
+        "model": "lstm",
+        "chunks": tagged,
     }
 
 

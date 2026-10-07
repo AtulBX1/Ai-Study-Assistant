@@ -31,6 +31,9 @@ Thumbs.db
 # Local data and model artifacts
 data/*
 !data/.gitkeep
+data/hf_cache/
+!data/labels/
+!data/labels/difficulty_weak.json
 !data/eval/
 !data/eval/questions_sample.json
 !data/eval/questions_real.json
@@ -42,8 +45,8 @@ backend/data/*
 !backend/data/.gitkeep
 storage/*
 !storage/.gitkeep
-models/*
-!models/.gitkeep
+/models/
+!/models/.gitkeep
 models/hf/
 models/glove/
 models/word2vec/

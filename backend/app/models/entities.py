@@ -142,6 +142,9 @@ class Chunk(Base):
     token_count: Mapped[int] = mapped_column(Integer, default=0)
     chunk_index: Mapped[int] = mapped_column(Integer, default=0)
     vector_id: Mapped[str | None] = mapped_column(String(128), unique=True)
+    difficulty_label: Mapped[str | None] = mapped_column(String(16))
+    difficulty_confidence: Mapped[float | None] = mapped_column(Float)
+    difficulty_model: Mapped[str | None] = mapped_column(String(32))
     document: Mapped[Document] = relationship(back_populates="chunks")
 
 
