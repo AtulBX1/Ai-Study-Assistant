@@ -130,6 +130,8 @@ def test_tokenizer_comparison_returns_tokens_ids_and_counts(monkeypatch) -> None
 
 
 def test_missing_weights_fail_lazily_with_clear_message(tmp_path, monkeypatch) -> None:
+    pytest.importorskip("torch")
+    pytest.importorskip("transformers")
     monkeypatch.setattr(inference, "MODEL_ROOT", tmp_path)
     inference._load_qa.cache_clear()
     with pytest.raises(FileNotFoundError, match="not trained yet"):
