@@ -43,6 +43,7 @@ class Settings(BaseSettings):
     max_pdf_size_bytes: int = Field(default=20 * 1024 * 1024, gt=0)
     max_pdf_pages: int = Field(default=500, gt=0)
     page_image_cache_size: int = Field(default=32, gt=0)
+    transformer_no_answer_threshold: float = Field(default=0.05, ge=0, le=1)
     s3_endpoint_url: str | None = None
     s3_region: str = "us-east-1"
     s3_bucket: str = "study-documents"

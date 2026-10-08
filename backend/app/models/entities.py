@@ -127,6 +127,21 @@ class DocumentPage(Base):
     document: Mapped[Document] = relationship(back_populates="pages")
 
 
+class DocumentKeyTerm(Base):
+    __tablename__ = "document_key_terms"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    document_id: Mapped[int] = mapped_column(
+        ForeignKey("documents.id", ondelete="CASCADE"), index=True
+    )
+    term: Mapped[str] = mapped_column(String(255))
+    label: Mapped[str] = mapped_column(String(32))
+    page: Mapped[int] = mapped_column(Integer)
+    start_offset: Mapped[int | None] = mapped_column(Integer)
+    end_offset: Mapped[int | None] = mapped_column(Integer)
+    source: Mapped[str] = mapped_column(String(32))
+
+
 class Chunk(Base):
     __tablename__ = "chunks"
 

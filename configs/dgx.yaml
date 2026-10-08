@@ -63,3 +63,41 @@ seq2seq:
   coverage: false
   mlflow: false
   max_seconds_per_variant: 1800
+
+transformers:
+  mlflow: true
+  qa:
+    model_id: distilbert/distilbert-base-uncased
+    max_seq_len: 384
+    batch_size: 8
+    grad_accumulation_steps: 8
+  ner:
+    dataset_id: tner/conll2003
+    model_id: distilbert/distilbert-base-uncased
+    max_seq_len: 256
+    batch_size: 8
+    grad_accumulation_steps: 8
+  summarization:
+    model_id: google-t5/t5-small
+    max_seq_len: 512
+    target_max_len: 128
+    batch_size: 4
+    grad_accumulation_steps: 8
+  question_generation:
+    model_id: google-t5/t5-small
+    max_seq_len: 512
+    target_max_len: 128
+    batch_size: 4
+    grad_accumulation_steps: 8
+  later_experiments:
+    bert_base:
+      model_id: google-bert/bert-base-uncased
+      batch_size: 4
+      grad_accumulation_steps: 8
+      gradient_checkpointing: true
+    t5_base:
+      model_id: google-t5/t5-base
+    bart_large:
+      model_id: facebook/bart-large
+    llm_7b:
+      note: "Reserved for suitable larger hardware; do not run on the 4 GB laptop."

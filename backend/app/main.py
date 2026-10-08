@@ -11,7 +11,7 @@ from app.core.cache import create_cache
 from app.core.config import get_settings
 from app.logging_config import configure_logging
 from app.middleware import RateLimitMiddleware, RequestIdMiddleware
-from app.routers import auth, classes, documents, lab, search
+from app.routers import auth, classes, documents, lab, search, transformers
 
 settings = get_settings()
 settings.validate_database_backend()
@@ -51,6 +51,8 @@ app.include_router(documents.router)
 app.include_router(classes.router)
 app.include_router(lab.router)
 app.include_router(search.router)
+app.include_router(transformers.lab_router)
+app.include_router(transformers.documents_router)
 
 
 @app.get("/health", tags=["health"])

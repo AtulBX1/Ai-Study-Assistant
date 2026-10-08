@@ -65,3 +65,81 @@ seq2seq:
   coverage: false
   mlflow: false
   max_seconds_per_variant: 1800
+
+transformers:
+  seed: 472
+  mlflow: false
+  qa:
+    dataset_id: rajpurkar/squad
+    model_id: distilbert/distilbert-base-uncased
+    train_samples: 20000
+    validation_samples: 2000
+    baseline_samples: 200
+    max_seq_len: 384
+    doc_stride: 128
+    batch_size: 8
+    eval_batch_size: 8
+    grad_accumulation_steps: 8
+    epochs: 3
+    learning_rate: 0.00003
+    eval_steps: 100
+    early_stopping_patience: 2
+    max_seconds: 1800
+    finalization_seconds: 180
+    seed: 472
+  ner:
+    dataset_id: tner/conll2003
+    model_id: distilbert/distilbert-base-uncased
+    train_samples: 14041
+    validation_samples: 3250
+    test_samples: 3453
+    max_seq_len: 256
+    batch_size: 8
+    eval_batch_size: 8
+    grad_accumulation_steps: 8
+    epochs: 3
+    learning_rate: 0.00003
+    eval_steps: 250
+    early_stopping_patience: 2
+    max_seconds: 1200
+    finalization_seconds: 120
+    seed: 472
+  summarization:
+    dataset_id: abisee/cnn_dailymail
+    dataset_config: 3.0.0
+    model_id: google-t5/t5-small
+    train_samples: 10000
+    validation_samples: 1000
+    test_samples: 1000
+    max_seq_len: 512
+    target_max_len: 128
+    batch_size: 2
+    eval_batch_size: 2
+    grad_accumulation_steps: 8
+    epochs: 3
+    learning_rate: 0.0003
+    eval_steps: 250
+    early_stopping_patience: 2
+    greedy_eval_samples: 500
+    beam_eval_samples: 200
+    max_seconds: 2400
+    finalization_seconds: 600
+    seed: 472
+  question_generation:
+    dataset_id: rajpurkar/squad
+    model_id: google-t5/t5-small
+    train_samples: 20000
+    validation_samples: 500
+    eval_samples: 200
+    max_seq_len: 512
+    target_max_len: 128
+    batch_size: 2
+    eval_batch_size: 2
+    grad_accumulation_steps: 8
+    epochs: 3
+    learning_rate: 0.0003
+    eval_steps: 250
+    early_stopping_patience: 2
+    max_seconds: 1800
+    finalization_seconds: 300
+    seed: 472

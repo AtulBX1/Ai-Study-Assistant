@@ -48,6 +48,7 @@ storage/*
 /models/
 !/models/.gitkeep
 models/hf/
+models/transformers/
 models/glove/
 models/word2vec/
 mlruns/
