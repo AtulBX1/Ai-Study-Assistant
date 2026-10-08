@@ -38,14 +38,14 @@ def clear_transformer_cache() -> None:
 @lru_cache(maxsize=1)
 def _load_qa() -> tuple[Any, Any, torch.device]:
     _configure_huggingface()
-    from transformers import AutoModelForQuestionAnswering, AutoTokenizer
-
     path = MODEL_ROOT / "qa"
     if not (path / "config.json").is_file():
         raise FileNotFoundError(
             f"Extractive QA weights are not trained yet. Expected {path}; "
             "run ml/transformers/qa/train.py first."
         )
+    from transformers import AutoModelForQuestionAnswering, AutoTokenizer
+
     tokenizer = AutoTokenizer.from_pretrained(path, local_files_only=True)
     model = AutoModelForQuestionAnswering.from_pretrained(
         path, local_files_only=True
@@ -57,14 +57,14 @@ def _load_qa() -> tuple[Any, Any, torch.device]:
 @lru_cache(maxsize=1)
 def _load_ner() -> tuple[Any, Any, torch.device]:
     _configure_huggingface()
-    from transformers import AutoModelForTokenClassification, AutoTokenizer
-
     path = MODEL_ROOT / "ner"
     if not (path / "config.json").is_file():
         raise FileNotFoundError(
             f"NER weights are not trained yet. Expected {path}; "
             "run ml/transformers/ner/train.py first."
         )
+    from transformers import AutoModelForTokenClassification, AutoTokenizer
+
     tokenizer = AutoTokenizer.from_pretrained(path, local_files_only=True)
     model = AutoModelForTokenClassification.from_pretrained(
         path, local_files_only=True
@@ -76,8 +76,6 @@ def _load_ner() -> tuple[Any, Any, torch.device]:
 @lru_cache(maxsize=2)
 def _load_t5(task: str) -> tuple[Any, Any, torch.device]:
     _configure_huggingface()
-    from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
-
     if task not in {"summarization", "question-generation"}:
         raise ValueError(f"Unsupported T5 task: {task}.")
     path = MODEL_ROOT / f"t5-{task}"
@@ -86,6 +84,8 @@ def _load_t5(task: str) -> tuple[Any, Any, torch.device]:
             f"T5 {task} weights are not trained yet. Expected {path}; "
             "run ml/transformers/t5/train.py first."
         )
+    from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
     tokenizer = AutoTokenizer.from_pretrained(path, local_files_only=True)
     model = AutoModelForSeq2SeqLM.from_pretrained(path, local_files_only=True).to(
         _device()
@@ -97,14 +97,14 @@ def _load_t5(task: str) -> tuple[Any, Any, torch.device]:
 @lru_cache(maxsize=1)
 def _load_attention_model() -> tuple[Any, Any, torch.device]:
     _configure_huggingface()
-    from transformers import AutoModel, AutoTokenizer
-
     path = MODEL_ROOT / "qa"
     if not (path / "config.json").is_file():
         raise FileNotFoundError(
             f"DistilBERT weights are not available yet. Train the QA model first; "
             f"expected {path}."
         )
+    from transformers import AutoModel, AutoTokenizer
+
     tokenizer = AutoTokenizer.from_pretrained(path, local_files_only=True)
     model = AutoModel.from_pretrained(path, local_files_only=True).to(_device())
     model.eval()
@@ -114,13 +114,13 @@ def _load_attention_model() -> tuple[Any, Any, torch.device]:
 @lru_cache(maxsize=1)
 def _load_tokenizers() -> tuple[Any, Any, Any]:
     _configure_huggingface()
-    from transformers import AutoTokenizer
-
     cache_names = {
         "gpt2": "openai-community/gpt2",
         "wordpiece": "distilbert/distilbert-base-uncased",
         "sentencepiece": "google-t5/t5-small",
     }
+    from transformers import AutoTokenizer
+
     try:
         return tuple(
             AutoTokenizer.from_pretrained(model_id, local_files_only=True)
