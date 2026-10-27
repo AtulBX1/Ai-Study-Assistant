@@ -59,3 +59,9 @@ mlruns/
 
 # Local Compose volumes and generated files
 *.log
+
+__pycache__/
+*.pyc
+.pytest-tmp/
+.ruff_cache/
+.pytest_cache/
