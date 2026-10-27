@@ -69,9 +69,7 @@ def fake_retriever(db, user_id: int, query: str, doc_ids=None, top_k=5):
 
     chunks = list(
         db.scalars(
-            select(Chunk)
-            .where(Chunk.doc_id.in_(docs.keys()))
-            .order_by(Chunk.id)
+            select(Chunk).where(Chunk.doc_id.in_(docs.keys())).order_by(Chunk.id)
         )
     )
     res = []
@@ -163,9 +161,7 @@ def test_streaming_order(client: TestClient, db_session) -> None:
 def test_citation_format(client: TestClient, db_session) -> None:
     user, doc = _setup_user_and_doc(db_session, "citation@example.com")
     fake = FakeProvider(
-        response_text=(
-            "SVMs separate classes using hyperplanes [ml-notes.pdf, p.1]."
-        )
+        response_text=("SVMs separate classes using hyperplanes [ml-notes.pdf, p.1].")
     )
     mock_pipeline = RAGChatPipeline(
         provider=fake,
@@ -177,9 +173,7 @@ def test_citation_format(client: TestClient, db_session) -> None:
     )
     client.app.dependency_overrides[get_rag_pipeline] = lambda: mock_pipeline
 
-    s_resp = client.post(
-        "/chat/sessions", headers=_auth_header(user.id), json={}
-    )
+    s_resp = client.post("/chat/sessions", headers=_auth_header(user.id), json={})
     session_id = s_resp.json()["id"]
 
     resp = client.post(
@@ -234,9 +228,7 @@ def test_provider_fallback_on_429_and_missing_key(
     )
     client.app.dependency_overrides[get_rag_pipeline] = lambda: pipe_429
 
-    s_resp = client.post(
-        "/chat/sessions", headers=_auth_header(user.id), json={}
-    )
+    s_resp = client.post("/chat/sessions", headers=_auth_header(user.id), json={})
     sid = s_resp.json()["id"]
 
     resp = client.post(
@@ -262,9 +254,7 @@ def test_provider_fallback_on_429_and_missing_key(
         context_retriever=fake_retriever,
         settings=Settings(llm_provider="gemini", gemini_api_key=""),
     )
-    client.app.dependency_overrides[get_rag_pipeline] = (
-        lambda: pipe_missing_key
-    )
+    client.app.dependency_overrides[get_rag_pipeline] = lambda: pipe_missing_key
 
     resp2 = client.post(
         f"/chat/sessions/{sid}/messages",
@@ -282,9 +272,7 @@ def test_provider_fallback_on_429_and_missing_key(
 
 
 def test_private_document_routing(client: TestClient, db_session) -> None:
-    user, doc = _setup_user_and_doc(
-        db_session, "privacy@example.com", is_private=True
-    )
+    user, doc = _setup_user_and_doc(db_session, "privacy@example.com", is_private=True)
     fake_ext = FakeProvider(name="gemini", is_external=True)
     pipe = RAGChatPipeline(
         provider=fake_ext,
@@ -296,9 +284,7 @@ def test_private_document_routing(client: TestClient, db_session) -> None:
     )
     client.app.dependency_overrides[get_rag_pipeline] = lambda: pipe
 
-    s_resp = client.post(
-        "/chat/sessions", headers=_auth_header(user.id), json={}
-    )
+    s_resp = client.post("/chat/sessions", headers=_auth_header(user.id), json={})
     sid = s_resp.json()["id"]
 
     resp = client.post(
@@ -332,9 +318,7 @@ def test_cache_hits(client: TestClient, db_session) -> None:
     )
     client.app.dependency_overrides[get_rag_pipeline] = lambda: pipe
 
-    s_resp = client.post(
-        "/chat/sessions", headers=_auth_header(user.id), json={}
-    )
+    s_resp = client.post("/chat/sessions", headers=_auth_header(user.id), json={})
     sid = s_resp.json()["id"]
 
     # First request - cache miss
@@ -377,15 +361,11 @@ def test_ownership_isolation(client: TestClient, db_session) -> None:
     user_b, _ = _setup_user_and_doc(db_session, "userb@example.com")
 
     # User A creates a session
-    s_resp = client.post(
-        "/chat/sessions", headers=_auth_header(user_a.id), json={}
-    )
+    s_resp = client.post("/chat/sessions", headers=_auth_header(user_a.id), json={})
     sid = s_resp.json()["id"]
 
     # User B attempts to access User A's session
-    get_resp = client.get(
-        f"/chat/sessions/{sid}", headers=_auth_header(user_b.id)
-    )
+    get_resp = client.get(f"/chat/sessions/{sid}", headers=_auth_header(user_b.id))
     assert get_resp.status_code == 404
 
     # User B attempts to post to User A's session
@@ -413,9 +393,7 @@ def test_api_key_never_appears_in_logs_or_responses(
     )
     client.app.dependency_overrides[get_rag_pipeline] = lambda: pipe
 
-    s_resp = client.post(
-        "/chat/sessions", headers=_auth_header(user.id), json={}
-    )
+    s_resp = client.post("/chat/sessions", headers=_auth_header(user.id), json={})
     sid = s_resp.json()["id"]
 
     with caplog.at_level("INFO"):
