@@ -1,0 +1,72 @@
+[
+  {
+    "page": 3,
+    "chunk": "NATURAL LANGUAGE PROCESSING (NLP)\n\uf0d8What is it? NLP is the branch of AI concerned with giving computers the ability to understand, interpret, and generate \nhuman language in a valuable way.\n\uf0d8The Core P...",
+    "generated_question": "What is NLP?",
+    "qa_answer": "NATURAL LANGUAGE PROCESSING",
+    "answer_in_chunk": true
+  },
+  {
+    "page": 10,
+    "chunk": "Phase\nTime Period\nMain Approach\nExample\nRule-Based Era\n1950s\u2013Late 1980s\nHandcrafted grammar and \ndictionary rules\nRule-based Machine \nTranslation\nStatistical NLP Era\n1990s\u2013Early 2010s\nProbability and ...",
+    "generated_question": "What is the name of Google Translate?",
+    "qa_answer": "",
+    "answer_in_chunk": false
+  },
+  {
+    "page": 21,
+    "chunk": "Concept\nExample\n1. Language as Structured Communication\nSentence: \"The cat sat on the mat.\" Grammar and syntax help identify that \n\"cat\" is the subject, \"sat\" is the verb, and \"on the mat\" indicates l...",
+    "generated_question": "What is the name of Apple's iPhone?",
+    "qa_answer": "techn",
+    "answer_in_chunk": true
+  },
+  {
+    "page": 37,
+    "chunk": "37\nAmbiguity\n1.Words and sentences have multiple meanings\n2.Context determines intended meaning in \nlanguage\n3.Duck sentence shows lexical ambiguity clearly\n4.Parser must infer meaning from context\nCo...",
+    "generated_question": "What is the purpose of a sentence?",
+    "qa_answer": "Context",
+    "answer_in_chunk": true
+  },
+  {
+    "page": 42,
+    "chunk": "MCQ  Practice\nResearchers in the 1950s attempted to make computers translate \nRussian text into English automatically. Which major area of NLP did \nthis early work contribute to?\nA. Machine Translatio...",
+    "generated_question": "What did MCQ practice researchers try to translate Russian text into English automatically?",
+    "qa_answer": "computers",
+    "answer_in_chunk": true
+  },
+  {
+    "page": 46,
+    "chunk": "MCQ  Practice\n\u2022 An NLP system processes the words \u201ccat,\u201d \u201ccats,\u201d \u201cwalk,\u201d and \n\u201cwalked.\u201d It notices that the words change to express grammatical \ninformation such as number or tense. Which type of morp...",
+    "generated_question": "What type of morphology is involved?",
+    "qa_answer": "A. Derivational morphology\nB. Inflectional morphology\nC. Lexical morphology\nD. Syntactic morphology",
+    "answer_in_chunk": true
+  },
+  {
+    "page": 50,
+    "chunk": "MCQ  Practice\n\u2022 An NLP system sees the sentence: \u201cThe children played in the park.\u201d It identifies \nthat children expresses plural meaning and played expresses past tense. Which \ntype of morphology is ...",
+    "generated_question": "What type of morphology is mainly involved?",
+    "qa_answer": "A. Derivational morphology\nB. Inflectional morphology\nC",
+    "answer_in_chunk": true
+  },
+  {
+    "page": 82,
+    "chunk": "Stop-Word Removal\nStop-words :very frequent words that carry little semantic \nmeaning.\nExample: \nis, am, are, the, a, an, in, on, at, of, for, and\nWhy Remove Them?\nBecause:\n\u2022They don\u2019t help classifica...",
+    "generated_question": "What does Stop-Word Removal mean?",
+    "qa_answer": "very frequent",
+    "answer_in_chunk": true
+  },
+  {
+    "page": 84,
+    "chunk": "Categories of Stopwords\nIt helps in making informed decisions:\n\u2022Standard Stopwords: articles (\"a\", \"the\"), conjunctions (\"and\", \"but\") and \nprepositions (\"in\", \"on\")\n\u2022Domain-Specific Stopwords: Contex...",
+    "generated_question": "What is the name of a term used to describe a topic in medical texts?",
+    "qa_answer": "",
+    "answer_in_chunk": false
+  },
+  {
+    "page": 92,
+    "chunk": "What is the main purpose of text preprocessing \nin NLP?\nA. To increase sentence length\nB. To convert text into numerical form\nC. To improve grammar\nD. To translate text\nCorrect Answer: B\nMachine learn...",
+    "generated_question": "What is the main purpose of text preprocessing in NLP?",
+    "qa_answer": "A.",
+    "answer_in_chunk": true
+  }
+]

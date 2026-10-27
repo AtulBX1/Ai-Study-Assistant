@@ -176,16 +176,18 @@ def save_loss_curve(log_history: list[dict[str, Any]], path: Path) -> None:
     figure.savefig(path, dpi=130)
     plt.close(figure)
 
+
 def _json_default(value):
     import numpy as np
 
     if isinstance(value, np.integer):
-       return int(value)
+        return int(value)
     if isinstance(value, np.floating):
-       return float(value)
+        return float(value)
     if isinstance(value, np.ndarray):
-       return value.tolist()
+        return value.tolist()
     raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
+
 
 def save_result(name: str, result: dict[str, Any]) -> None:
     """Persist a mode result alongside existing transformer evaluation tables."""
@@ -193,7 +195,10 @@ def save_result(name: str, result: dict[str, Any]) -> None:
     path = MODEL_ROOT / "evaluation.json"
     previous = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
     previous[name] = result
-    path.write_text(json.dumps(previous, indent=2, default=_json_default), encoding="utf-8")
+    path.write_text(
+        json.dumps(previous, indent=2, default=_json_default), encoding="utf-8"
+    )
+
 
 def log_mlflow(name: str, result: dict[str, Any], enabled: bool) -> None:
     """Log scalar evaluation values only when MLflow is enabled in YAML."""

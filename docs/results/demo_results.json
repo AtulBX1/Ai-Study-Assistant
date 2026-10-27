@@ -1,0 +1,122 @@
+{
+  "qa_found": {
+    "answer": "NATURAL LANGUAGE PROCESSING",
+    "confidence": 0.729605,
+    "start_offset": 0,
+    "end_offset": 27,
+    "found": true
+  },
+  "qa_not_found": {
+    "answer": "NATURAL LANGUAGE PROCESSING",
+    "confidence": 0.581748,
+    "start_offset": 0,
+    "end_offset": 27,
+    "found": true
+  },
+  "ner_entities": [
+    {
+      "label": "ORG",
+      "start_offset": 16,
+      "end_offset": 18,
+      "text": "NL"
+    },
+    {
+      "label": "MISC",
+      "start_offset": 18,
+      "end_offset": 19,
+      "text": "P"
+    },
+    {
+      "label": "ORG",
+      "start_offset": 42,
+      "end_offset": 58,
+      "text": "Google Translate"
+    },
+    {
+      "label": "ORG",
+      "start_offset": 95,
+      "end_offset": 102,
+      "text": "ChatGPT"
+    },
+    {
+      "label": "ORG",
+      "start_offset": 104,
+      "end_offset": 108,
+      "text": "Siri"
+    },
+    {
+      "label": "ORG",
+      "start_offset": 110,
+      "end_offset": 115,
+      "text": "Alexa"
+    }
+  ],
+  "tokenizers": {
+    "gpt2_bpe": {
+      "tokens": [
+        "Transform",
+        "ers",
+        "\u0120use",
+        "\u0120attention",
+        "!"
+      ],
+      "token_count": 5
+    },
+    "distilbert_wordpiece": {
+      "tokens": [
+        "[CLS]",
+        "transformers",
+        "use",
+        "attention",
+        "!",
+        "[SEP]"
+      ],
+      "token_count": 6
+    },
+    "t5_sentencepiece": {
+      "tokens": [
+        "\u2581Transformer",
+        "s",
+        "\u2581use",
+        "\u2581attention",
+        "!",
+        "</s>"
+      ],
+      "token_count": 6
+    }
+  },
+  "attention": {
+    "tokens": [
+      "[CLS]",
+      "natural",
+      "language",
+      "processing",
+      "is",
+      "fun",
+      ".",
+      "[SEP]"
+    ],
+    "shape": [
+      0,
+      12,
+      8,
+      8
+    ]
+  },
+  "positional_encoding": {
+    "shape": [
+      4,
+      8
+    ],
+    "row_0": [
+      0.0,
+      1.0,
+      0.0,
+      1.0,
+      0.0,
+      1.0,
+      0.0,
+      1.0
+    ]
+  }
+}

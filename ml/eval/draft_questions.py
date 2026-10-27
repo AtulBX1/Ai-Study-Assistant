@@ -13,8 +13,8 @@ BACKEND_ROOT = PROJECT_ROOT / "backend"
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
-from app.nlp.preprocessing import sentence_segmentation  # noqa: E402
-from app.retrieval.base import preprocess_tokens  # noqa: E402
+from app.nlp.preprocessing import sentence_segmentation
+from app.retrieval.base import preprocess_tokens
 
 QUESTION_TEMPLATES = (
     "What does the document say about {term}?",

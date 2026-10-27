@@ -1,0 +1,56 @@
+{
+  "none": {
+    "greedy_500": {
+      "rouge1": 0.12170455060896758,
+      "rouge2": 0.009035673221646463,
+      "rougeL": 0.09872135923446726,
+      "bleu": 0.24588834111898916,
+      "average_summary_length": 40.274,
+      "repeated_trigram_rate": 0.0
+    },
+    "beam_200": {
+      "rouge1": 0.09395018813766129,
+      "rouge2": 0.008866778488436868,
+      "rougeL": 0.07658755045225689,
+      "bleu": 0.18834369907502704,
+      "average_summary_length": 32.81,
+      "repeated_trigram_rate": 0.0
+    }
+  },
+  "bahdanau": {
+    "greedy_500": {
+      "rouge1": 0.14794567742096798,
+      "rouge2": 0.018534209765497644,
+      "rougeL": 0.11656727890317276,
+      "bleu": 0.4194043467305205,
+      "average_summary_length": 40.656,
+      "repeated_trigram_rate": 0.0
+    },
+    "beam_200": {
+      "rouge1": 0.1258995582888662,
+      "rouge2": 0.016211908959891518,
+      "rougeL": 0.09709616092735823,
+      "bleu": 0.5093132813024045,
+      "average_summary_length": 23.24,
+      "repeated_trigram_rate": 0.0
+    }
+  },
+  "luong": {
+    "greedy_500": {
+      "rouge1": 0.1378657857042496,
+      "rouge2": 0.01332889528335563,
+      "rougeL": 0.11037690253596616,
+      "bleu": 0.32542003587073987,
+      "average_summary_length": 38.424,
+      "repeated_trigram_rate": 0.0
+    },
+    "beam_200": {
+      "rouge1": 0.09683852631391543,
+      "rouge2": 0.012050327046943725,
+      "rougeL": 0.07949797488814045,
+      "bleu": 0.3372913093764632,
+      "average_summary_length": 20.48,
+      "repeated_trigram_rate": 0.0
+    }
+  }
+}
