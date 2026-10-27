@@ -83,6 +83,7 @@ class Document(TimestampMixin, Base):
     page_count: Mapped[int | None] = mapped_column(Integer)
     language: Mapped[str | None] = mapped_column(String(32))
     storage_key: Mapped[str | None] = mapped_column(String(512))
+    is_private: Mapped[bool] = mapped_column(Boolean, default=False)
     chunks: Mapped[list["Chunk"]] = relationship(
         back_populates="document", cascade="all, delete-orphan"
     )
@@ -187,7 +188,12 @@ class Message(Base):
     content: Mapped[str] = mapped_column(Text)
     citations: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
     grounding_score: Mapped[float | None] = mapped_column(Float)
+    unsupported_sentences: Mapped[list[str]] = mapped_column(JSON, default=list)
+    explanation: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    provider: Mapped[str | None] = mapped_column(String(64))
+    latency_ms: Mapped[float | None] = mapped_column(Float)
     feedback: Mapped[str | None] = mapped_column(String(32))
+    feedback_reason: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now
     )

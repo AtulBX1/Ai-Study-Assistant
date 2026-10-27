@@ -50,6 +50,21 @@ class Settings(BaseSettings):
     s3_access_key_id: str | None = None
     s3_secret_access_key: str | None = None
     minio_bucket: str = "study-documents"
+    llm_provider: str = "gemini"
+    llm_model: str = "gemini-3.5-flash"
+    gemini_api_key: str | None = None
+    allow_external_llm: bool = True
+    ollama_base_url: str = "http://localhost:11434"
+    ollama_model: str = "llama3.2:1b"
+    rag_rate_limit_per_minute: int = Field(default=15, ge=1)
+    rag_request_budget_per_day: int = Field(default=1000, ge=1)
+    rag_request_timeout_seconds: float = Field(default=30.0, gt=0)
+    rag_retrieval_confidence_threshold: float = Field(default=0.0, ge=-100, le=100)
+    rag_grounding_sentence_threshold: float = Field(default=0.45, ge=0, le=1)
+    langfuse_public_key: str | None = None
+    langfuse_secret_key: str | None = None
+    langfuse_host: str = "https://cloud.langfuse.com"
+    rag_playground_model: Literal["distilgpt2", "gpt2"] = "distilgpt2"
 
     @property
     def cors_origin_list(self) -> list[str]:
