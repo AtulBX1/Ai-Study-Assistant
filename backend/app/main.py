@@ -17,10 +17,12 @@ from app.routers import (
     classes,
     documents,
     lab,
+    quizzes,
     rag_playground,
     search,
     transformers,
 )
+from app.services.rag.providers import provider_cooldown_status
 
 settings = get_settings()
 settings.validate_database_backend()
@@ -62,11 +64,29 @@ app.include_router(lab.router)
 app.include_router(rag_playground.router)
 app.include_router(search.router)
 app.include_router(chat.router)
+app.include_router(quizzes.router)
 app.include_router(transformers.lab_router)
 app.include_router(transformers.documents_router)
 
 
 @app.get("/health", tags=["health"])
-async def health() -> dict[str, str]:
-    """Report that the API process is responding."""
-    return {"status": "ok"}
+async def health() -> dict:
+    """Report process health and key-free LLM provider readiness."""
+    names = [
+        name.strip().lower()
+        for name in settings.llm_provider_chain.split(",")
+        if name.strip()
+    ]
+    return {
+        "status": "ok",
+        "llm": {
+            "active_chain": names,
+            "providers": {
+                name: {
+                    "configured": name != "groq" or bool(settings.groq_api_key),
+                    "cooldown_until": provider_cooldown_status(name),
+                }
+                for name in names
+            },
+        },
+    }

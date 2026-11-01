@@ -267,7 +267,8 @@ def test_provider_fallback_on_429_and_missing_key(
         if line.startswith("data: ")
     ]
     done2 = events2[-1]
-    assert "extractive (fallback: missing key)" in done2["provider"]
+    assert "extractive" in done2["provider"]
+    assert "gemini:missing_key" in done2["provider"]
     client.app.dependency_overrides.clear()
 
 

@@ -12,7 +12,10 @@ def test_health_reports_ok_and_generates_request_id() -> None:
     response = client.get("/health")
 
     assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+    body = response.json()
+    assert body["status"] == "ok"
+    assert body["llm"]["active_chain"]
+    assert "providers" in body["llm"]
     assert response.headers["x-request-id"]
 
 

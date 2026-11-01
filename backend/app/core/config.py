@@ -44,6 +44,7 @@ class Settings(BaseSettings):
     max_pdf_pages: int = Field(default=500, gt=0)
     page_image_cache_size: int = Field(default=32, gt=0)
     transformer_no_answer_threshold: float = Field(default=0.05, ge=0, le=1)
+    quiz_round_trip_f1_threshold: float = Field(default=0.65, ge=0, le=1)
     s3_endpoint_url: str | None = None
     s3_region: str = "us-east-1"
     s3_bucket: str = "study-documents"
@@ -51,8 +52,21 @@ class Settings(BaseSettings):
     s3_secret_access_key: str | None = None
     minio_bucket: str = "study-documents"
     llm_provider: str = "gemini"
+    llm_provider_chain: str = "gemini,extractive"
     llm_model: str = "gemini-3.5-flash"
     gemini_api_key: str | None = None
+    groq_api_key: str | None = None
+    groq_model: str | None = None
+    groq_quiz_model: str | None = None
+    groq_quiz_max_output_tokens: int = Field(default=1800, ge=1)
+    groq_quiz_input_token_limit: int = Field(default=1500, ge=1)
+    groq_base_url: str = "https://api.groq.com/openai/v1"
+    groq_requests_per_minute: int = Field(default=25, ge=1)
+    groq_tokens_per_minute: int = Field(default=5000, ge=1)
+    llm_max_output_tokens: int = Field(default=1024, ge=1)
+    llm_context_token_budget: int = Field(default=6000, ge=1)
+    quiz_llm_min_delay_seconds: float = Field(default=1.0, ge=0)
+    quiz_llm_backoff_cap_seconds: float = Field(default=8.0, ge=0)
     allow_external_llm: bool = True
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "llama3.2:1b"

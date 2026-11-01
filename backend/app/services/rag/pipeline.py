@@ -25,8 +25,10 @@ from app.services.rag.prompts import (
 from app.services.rag.providers import (
     ExtractiveProvider,
     GeminiProvider,
+    GroqProvider,
     LLMProvider,
     OllamaProvider,
+    ProviderChain,
     ProviderError,
     ProviderUnavailableError,
     RateLimitError,
@@ -72,6 +74,43 @@ class RAGChatPipeline:
         self.provider = provider or self._resolve_primary_provider()
 
     def _resolve_primary_provider(self) -> LLMProvider:
+        if (
+            "," in self.settings.llm_provider_chain
+            or self.settings.llm_provider_chain.strip().lower() != "gemini"
+        ):
+            providers: list[Any] = []
+            for name in self.settings.llm_provider_chain.split(","):
+                name = name.strip().lower()
+                if name == "gemini":
+                    providers.append(
+                        GeminiProvider(
+                            api_key=self.settings.gemini_api_key,
+                            model_name=self.settings.llm_model,
+                            timeout_seconds=self.settings.rag_request_timeout_seconds,
+                        )
+                    )
+                elif name == "groq":
+                    providers.append(
+                        GroqProvider(
+                            timeout_seconds=self.settings.rag_request_timeout_seconds
+                        )
+                    )
+                elif name == "ollama":
+                    providers.append(
+                        OllamaProvider(
+                            base_url=self.settings.ollama_base_url,
+                            model_name=self.settings.ollama_model,
+                            timeout_seconds=self.settings.rag_request_timeout_seconds,
+                        )
+                    )
+                elif name == "extractive":
+                    continue
+            if providers:
+                return ProviderChain(
+                    providers, context_budget=self.settings.llm_context_token_budget
+                )
+            if "extractive" in self.settings.llm_provider_chain.lower():
+                return self.extractive_provider
         provider_name = (self.settings.llm_provider or "gemini").lower()
         if provider_name == "gemini":
             return GeminiProvider(
@@ -104,7 +143,7 @@ class RAGChatPipeline:
 
         active_provider = provider or self.provider
         # If active provider is an external or local LLM (not extractive), try rewriting
-        if getattr(active_provider, "name", "") in {"gemini", "ollama", "fake"}:
+        if getattr(active_provider, "name", "") in {"gemini", "groq", "ollama", "fake"}:
             try:
                 history_text = "\n".join(
                     f"{msg.get('role', 'user')}: {msg.get('content', '')}"
@@ -429,12 +468,18 @@ class RAGChatPipeline:
                     query, chunks
                 )
                 for token in active_provider.stream(extractive_ans):
-                    safe_token = redact_secrets(token, [self.settings.gemini_api_key])
+                    safe_token = redact_secrets(
+                        token,
+                        [self.settings.gemini_api_key, self.settings.groq_api_key],
+                    )
                     answer_tokens.append(safe_token)
                     yield f"data: {json.dumps({'token': safe_token})}\n\n"
             else:
                 for token in active_provider.stream(full_prompt, system_prompt):
-                    safe_token = redact_secrets(token, [self.settings.gemini_api_key])
+                    safe_token = redact_secrets(
+                        token,
+                        [self.settings.gemini_api_key, self.settings.groq_api_key],
+                    )
                     answer_tokens.append(safe_token)
                     yield f"data: {json.dumps({'token': safe_token})}\n\n"
 
@@ -449,18 +494,36 @@ class RAGChatPipeline:
                 "Active provider failed; falling back to extractive: %s", exc
             )
             active_provider = self.extractive_provider
-            provider_label = f"answered by: extractive (fallback: {err_reason})"
+            if isinstance(self.provider, ProviderChain) and self.provider.skipped:
+                skipped = ", ".join(
+                    f"{item['provider']}:{item['reason']}"
+                    for item in self.provider.skipped
+                )
+                provider_label = f"answered by: extractive (skipped: {skipped})"
+            else:
+                provider_label = f"answered by: extractive (fallback: {err_reason})"
             answer_tokens.clear()
 
             extractive_ans, citations = active_provider.answer_with_chunks(
                 query, chunks
             )
             for token in active_provider.stream(extractive_ans):
-                safe_token = redact_secrets(token, [self.settings.gemini_api_key])
+                safe_token = redact_secrets(
+                    token, [self.settings.gemini_api_key, self.settings.groq_api_key]
+                )
                 answer_tokens.append(safe_token)
                 yield f"data: {json.dumps({'token': safe_token})}\n\n"
 
         final_answer = "".join(answer_tokens).strip()
+
+        if isinstance(active_provider, ProviderChain):
+            skipped = ", ".join(
+                f"{item['provider']}:{item['reason']}"
+                for item in active_provider.skipped
+            )
+            provider_label = f"answered by: {active_provider.last_provider}" + (
+                f" (skipped: {skipped})" if skipped else ""
+            )
 
         # Parse citations if not already provided by extractive provider
         if not citations:
@@ -501,7 +564,9 @@ class RAGChatPipeline:
             )
 
         # 9. Persist assistant message in DB
-        safe_answer = redact_secrets(final_answer, [self.settings.gemini_api_key])
+        safe_answer = redact_secrets(
+            final_answer, [self.settings.gemini_api_key, self.settings.groq_api_key]
+        )
         bot_msg = Message(
             session_id=session_id,
             role="assistant",

@@ -211,6 +211,8 @@ class Quiz(TimestampMixin, Base):
     source_document_id: Mapped[int | None] = mapped_column(
         ForeignKey("documents.id", ondelete="SET NULL")
     )
+    engine: Mapped[str] = mapped_column(String(16), default="classic")
+    generation_report: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     questions: Mapped[list["Question"]] = relationship(
         back_populates="quiz", cascade="all, delete-orphan"
     )
@@ -229,6 +231,9 @@ class Question(Base):
     options: Mapped[list[Any] | dict[str, Any] | None] = mapped_column(JSON)
     answer: Mapped[str] = mapped_column(Text)
     explanation: Mapped[str | None] = mapped_column(Text)
+    engine: Mapped[str] = mapped_column(String(16), default="classic")
+    topic: Mapped[str] = mapped_column(String(255), default="General")
+    page: Mapped[int] = mapped_column(Integer, default=1)
     source_chunk_id: Mapped[int | None] = mapped_column(
         ForeignKey("chunks.id", ondelete="SET NULL")
     )

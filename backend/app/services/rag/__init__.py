@@ -18,8 +18,10 @@ from app.services.rag.providers import (
     ExtractiveProvider,
     FakeProvider,
     GeminiProvider,
+    GroqProvider,
     LLMProvider,
     OllamaProvider,
+    ProviderChain,
 )
 from app.services.rag.safety import AnswerCache, RateLimiter, normalize_question
 
@@ -29,6 +31,8 @@ __all__ = [
     "get_global_answer_cache",
     "LLMProvider",
     "GeminiProvider",
+    "GroqProvider",
+    "ProviderChain",
     "OllamaProvider",
     "ExtractiveProvider",
     "FakeProvider",

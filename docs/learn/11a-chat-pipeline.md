@@ -15,6 +15,12 @@ The RAG pipeline solves this by decoupling knowledge retrieval from generation:
 4. **Context Building**: The top-$k$ reranked passages are formatted with document titles, page numbers, and chunk identifiers.
 5. **Grounded Generation**: The LLM synthesizes an answer restricted strictly to facts presented in the retrieved context.
 
+### Provider chain and Groq
+
+`LLM_PROVIDER_CHAIN` is a comma-separated ordered list (default `gemini,extractive`). Supported hosted choices include Gemini and Groq; Ollama is local, and extractive QA remains the local fallback. Groq uses the OpenAI-compatible `/chat/completions` API at `GROQ_BASE_URL` (default `https://api.groq.com/openai/v1`), with its credential in `GROQ_API_KEY`. Chat selects `GROQ_MODEL`; quiz generation can override it with `GROQ_QUIZ_MODEL` and uses `GROQ_QUIZ_INPUT_TOKEN_LIMIT` plus `GROQ_QUIZ_MAX_OUTPUT_TOKENS` to bound reasoning-model requests. Missing keys, rate limits, server errors, and timeouts advance the chain. The response provider label includes the successful provider and earlier skip reasons. Private documents never enter a chain containing external providers.
+
+Groq rate limits default to 25 requests/minute and 5,000 tokens/minute (`GROQ_REQUESTS_PER_MINUTE`, `GROQ_TOKENS_PER_MINUTE`). The chain applies a local rolling minute budget; Retry-After and rate limit response headers update provider limits and establish a process-local cooldown. Prompts are estimated before submission and context is clipped to the configured `LLM_CONTEXT_TOKEN_BUDGET`; output is capped by `LLM_MAX_OUTPUT_TOKENS`. `/health` reports the active chain and key-free provider readiness/cooldown fields.
+
 ---
 
 ## 2. Prompt Grounding & Untrusted Data Defense
