@@ -97,6 +97,10 @@ VERB_HINTS = {
     "was",
     "were",
     "work",
+    "convert",
+    "interpret",
+    "study",
+    "support",
 }
 
 
@@ -218,6 +222,11 @@ def readability_score(stem: str) -> float:
             token not in STEM_STOPWORDS and token not in VERB_HINTS
             for token in tokens[:verb_index]
         )
+        verb_text = tokens[verb_index]
+        verb_offset = text.casefold().find(verb_text)
+        blank_match = re.search(r"_{3,}", text)
+        if blank_match and 0 <= blank_match.start() < verb_offset:
+            has_subject = True
         if not has_subject and len(tokens) > 1 and tokens[0] in wh_words:
             # For WH-questions, the second token or later can be the subject
             for i in range(1, len(tokens)):

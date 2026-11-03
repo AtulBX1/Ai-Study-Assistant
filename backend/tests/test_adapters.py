@@ -134,9 +134,7 @@ def test_alembic_migrates_sqlite_database(
     get_settings.cache_clear()
     try:
         config = Config(str(ALEMBIC_INI))
-        config.set_main_option(
-            "script_location", str(ALEMBIC_INI.parent / "alembic")
-        )
+        config.set_main_option("script_location", str(ALEMBIC_INI.parent / "alembic"))
         command.upgrade(config, "head")
         engine = create_engine(database_url)
         try:
@@ -158,9 +156,7 @@ def test_alembic_generates_postgresql_offline_sql(
     get_settings.cache_clear()
     try:
         config = Config(str(ALEMBIC_INI))
-        config.set_main_option(
-            "script_location", str(ALEMBIC_INI.parent / "alembic")
-        )
+        config.set_main_option("script_location", str(ALEMBIC_INI.parent / "alembic"))
         output = StringIO()
         config.output_buffer = output
         command.upgrade(config, "head", sql=True)

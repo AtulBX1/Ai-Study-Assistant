@@ -51,6 +51,30 @@ NOUN_PHRASE = re.compile(
 )
 SENTENCE_START_FRAGMENTS = {"and", "because", "but", "or", "so", "which"}
 SENTENCE_END_FRAGMENTS = {"and", "because", "but", "for", "of", "or", "to", "with"}
+PRONOUN_OR_DEMONSTRATIVE_STARTS = {
+    "this",
+    "it",
+    "they",
+    "these",
+    "that",
+    "which",
+}
+VERB_OR_MODAL_STARTS = {
+    "allows",
+    "can",
+    "could",
+    "does",
+    "do",
+    "is",
+    "may",
+    "might",
+    "must",
+    "should",
+    "was",
+    "were",
+    "will",
+    "would",
+}
 TOKEN = re.compile(r"[A-Za-z0-9]+(?:[-'][A-Za-z0-9]+)*")
 LLM_PROMPT_VERSION = "quiz-json-v3-evidence"
 _LLM_RESPONSE_CACHE: dict[tuple[int, str, str], list[QuizQuestion]] = {}
@@ -426,12 +450,12 @@ def complete_source_sentences(text: str) -> list[str]:
             len(words) < 8
             or len(words) > 35
             or not sentence[:1].isupper()
-            or not sentence.endswith(".")
+            or sentence[-1] not in ".!?"
             or not _contains_verb(sentence)
             or readability_score(sentence) < 1.0
             or sum(sentence.count(mark) for mark in ".!?_") > 1
-            or words[0].casefold()
-            in {"this", "it", "they", "these", "that", "which", "may", "can", "allows"}
+            or words[0].casefold() in PRONOUN_OR_DEMONSTRATIVE_STARTS
+            or words[0].casefold() in VERB_OR_MODAL_STARTS
             or not has_explicit_subject(sentence)
         ):
             continue
@@ -444,11 +468,12 @@ def has_explicit_subject(sentence: str) -> bool:
         from app.nlp.preprocessing import _spacy_model
 
         nlp = _spacy_model()
-        return bool(
-            nlp and any(t.dep_ in {"nsubj", "nsubjpass"} for t in nlp(sentence))
-        )
+        if nlp is not None and nlp.has_pipe("parser"):
+            return any(t.dep_ in {"nsubj", "nsubjpass"} for t in nlp(sentence))
     except (ImportError, OSError, ValueError):
-        return bool(re.match(r"^[A-Z][\w-]*(?:\s+[\w-]+){0,4}\s+", sentence))
+        pass
+    # Deterministic fallback for environments without a downloaded parser.
+    return bool(re.match(r"^[A-Z][\w-]*(?:\s+[\w-]+){0,4}\s+", sentence))
 
 
 def _contains_verb(text: str) -> bool:
@@ -462,7 +487,7 @@ def _contains_verb(text: str) -> bool:
         pass
     return bool(
         re.search(
-            r"\b(?:am|are|be|been|being|can|could|did|does|do|had|has|have|is|may|might|must|shall|should|was|were|will|would|adds?|applies|called|contains?|creates?|describes?|develops?|enables?|explains?|generates?|includes?|involves?|learns?|means?|models?|occur|provides?|represents?|requires?|shows?|uses?|works?|\w+(?:ed|ing|izes|ises))\b",
+            r"\b(?:am|are|be|been|being|can|could|did|does|do|had|has|have|is|may|might|must|shall|should|was|were|will|would|adds?|applies|called|contains?|converts?|creates?|describes?|develops?|enables?|explains?|generates?|includes?|involves?|learns?|means?|models?|occur|provides?|represents?|requires?|shows?|studies|supports?|uses?|works?|\w+(?:ed|ing|izes|ises))\b",
             text,
             re.I,
         )

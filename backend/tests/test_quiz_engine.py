@@ -31,6 +31,14 @@ from app.services.quiz.validation import (
 from app.services.rag.providers import RateLimitError
 
 
+@pytest.fixture(autouse=True)
+def quiz_tests_without_spacy(monkeypatch):
+    """Keep quiz generation tests on its deterministic, lightweight fallback."""
+    from app.nlp import preprocessing
+
+    monkeypatch.setattr(preprocessing, "_spacy_model", lambda: None)
+
+
 def _question(**overrides):
     data = {
         "question": "Which organization developed the Python language?",
@@ -295,6 +303,19 @@ def test_false_statements_swap_readable_same_type_terms_and_honor_quota():
     questions = engine.generate(chunk, type_cycle=("true_false",), question_quota=2)
     assert [item.correct_answer for item in questions] == ["True"]
     assert len(questions) == 1
+
+
+def test_lone_true_statement_is_engine_candidate_but_assembly_enforces_balance():
+    source = "Cats are mammals that often live with people inside family homes."
+    engine = ClassicEngine(
+        entity_extractor=lambda _: [{"text": "Cats", "label": "ANIMAL"}]
+    )
+    chunk = SimpleNamespace(id=4, page=5, text=source, difficulty_label="easy")
+
+    candidates = engine.generate(chunk, type_cycle=("true_false",), question_quota=1)
+
+    assert [item.correct_answer for item in candidates] == ["True"]
+    assert balance_true_false_questions(candidates) == []
 
 
 def test_quiz_assembly_balances_true_false_without_rejecting_true_candidates():

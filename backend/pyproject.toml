@@ -57,15 +57,27 @@ target-version = ["py311"]
 [tool.ruff]
 target-version = "py311"
 line-length = 88
-extend-exclude = [".pytest-tmp*", "pytest-run-*", ".uv_cache*"]
+extend-exclude = [
+    ".pytest-tmp*",
+    ".pytest-final*",
+    ".pytest_ci_temp",
+    ".tmp*",
+    ".uv-cache",
+    "pytest-run-*",
+    ".uv_cache*",
+]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/conftest.py" = ["E402"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = [".", ".."]
 markers = [
+    "allow_local_network: permits intentional local-only socket use in a test",
     "slow: downloads or exercises large external embedding data",
     "gpu: uses CUDA when available",
     "download: downloads external dataset files",
