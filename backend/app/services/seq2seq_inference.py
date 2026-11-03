@@ -5,8 +5,6 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, Literal
 
-import torch
-
 ROOT = Path(__file__).resolve().parents[3]
 MODEL_VARIANTS = ("none", "bahdanau", "luong")
 
@@ -19,7 +17,9 @@ def _project_imports() -> None:
 @lru_cache(maxsize=3)
 def _load_model(
     variant: Literal["none", "bahdanau", "luong"],
-) -> tuple[Any, Any, torch.device]:
+) -> tuple[Any, Any, Any]:
+    import torch
+
     _project_imports()
     from ml.seq2seq.models import Seq2SeqConfig, SequenceToSequence
     from ml.seq2seq.vocabulary import Seq2SeqVocabulary
@@ -51,6 +51,8 @@ def summarize(
     decoding: Literal["greedy", "beam"],
     beam_width: int = 4,
 ) -> dict[str, Any]:
+    import torch
+
     _project_imports()
     from ml.seq2seq.decoding import beam_search, greedy_search
     from ml.seq2seq.vocabulary import EOS_ID, tokenize_seq2seq

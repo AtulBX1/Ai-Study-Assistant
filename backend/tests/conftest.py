@@ -1,5 +1,16 @@
 """Shared isolated database and authentication fixtures."""
 
+import sys
+from pathlib import Path
+
+# Ensure the backend and project-root packages are importable when
+# pytest is run from the repository root or any other working directory.
+_BACKEND_DIR = Path(__file__).resolve().parent.parent
+_PROJECT_ROOT = Path(__file__).resolve().parents[2]
+for _path in (_BACKEND_DIR, _PROJECT_ROOT):
+    if str(_path) not in sys.path:
+        sys.path.insert(0, str(_path))
+
 from collections.abc import Generator
 from datetime import UTC, datetime, timedelta
 

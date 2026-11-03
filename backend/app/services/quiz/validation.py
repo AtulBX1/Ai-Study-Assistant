@@ -85,6 +85,7 @@ VERB_HINTS = {
     "is",
     "learn",
     "make",
+    "maintain",
     "mean",
     "need",
     "occur",
@@ -97,6 +98,22 @@ VERB_HINTS = {
     "were",
     "work",
 }
+
+
+def _is_verb_token(token: str) -> bool:
+    """Recognize common inflected verbs in the no-model CI fallback."""
+    word = token.casefold()
+    forms = {word}
+    if word.endswith("ies") and len(word) > 3:
+        forms.add(word[:-3] + "y")
+    if word.endswith("es") and len(word) > 2:
+        forms.add(word[:-2])
+    if word.endswith("s") and len(word) > 1:
+        forms.add(word[:-1])
+    return any(
+        form in VERB_HINTS or form.endswith(("ed", "ing", "ize", "ise"))
+        for form in forms
+    )
 
 
 def readability_score(stem: str) -> float:
@@ -124,7 +141,7 @@ def readability_score(stem: str) -> float:
             (
                 index
                 for index, token in enumerate(question_tokens[2:], start=2)
-                if token in VERB_HINTS or token.endswith(("ed", "ing", "ize", "ise"))
+                if _is_verb_token(token)
             ),
             None,
         )
@@ -153,11 +170,7 @@ def readability_score(stem: str) -> float:
     if not tokens:
         return 0.0
     verb_index = next(
-        (
-            index
-            for index, token in enumerate(tokens)
-            if token in VERB_HINTS or token.endswith(("ed", "ing", "ize", "ise"))
-        ),
+        (index for index, token in enumerate(tokens) if _is_verb_token(token)),
         None,
     )
     has_verb = verb_index is not None
@@ -186,8 +199,7 @@ def readability_score(stem: str) -> float:
                 (
                     index
                     for index, token in enumerate(tokens[2:], start=2)
-                    if token in VERB_HINTS
-                    or token.endswith(("ed", "ing", "ize", "ise"))
+                    if _is_verb_token(token)
                 ),
                 len(tokens),
             )
@@ -199,10 +211,19 @@ def readability_score(stem: str) -> float:
         else:
             has_subject = tokens[0] in {"what", "who", "which"}
     else:
+        # For WH-questions (e.g., "Which foundation maintains...?"),
+        # check if there's a subject among tokens before the verb.
+        # Also check if the second token can be a subject.
         has_subject = any(
             token not in STEM_STOPWORDS and token not in VERB_HINTS
             for token in tokens[:verb_index]
         )
+        if not has_subject and len(tokens) > 1 and tokens[0] in wh_words:
+            # For WH-questions, the second token or later can be the subject
+            for i in range(1, len(tokens)):
+                if tokens[i] not in STEM_STOPWORDS and tokens[i] not in VERB_HINTS:
+                    has_subject = True
+                    break
     return (int(has_subject) + int(has_verb)) / 2
 
 

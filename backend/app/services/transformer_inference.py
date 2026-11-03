@@ -4,8 +4,6 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-import torch
-
 ROOT = Path(__file__).resolve().parents[3]
 MODEL_ROOT = ROOT / "models" / "transformers"
 MAX_MODEL_INPUT_CHARS = 20_000
@@ -22,7 +20,9 @@ def _configure_huggingface() -> None:
         os_environ_ready = True
 
 
-def _device() -> torch.device:
+def _device() -> Any:
+    import torch
+
     return torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
@@ -36,7 +36,7 @@ def clear_transformer_cache() -> None:
 
 
 @lru_cache(maxsize=1)
-def _load_qa() -> tuple[Any, Any, torch.device]:
+def _load_qa() -> tuple[Any, Any, Any]:
     _configure_huggingface()
     path = MODEL_ROOT / "qa"
     if not (path / "config.json").is_file():
@@ -55,7 +55,7 @@ def _load_qa() -> tuple[Any, Any, torch.device]:
 
 
 @lru_cache(maxsize=1)
-def _load_ner() -> tuple[Any, Any, torch.device]:
+def _load_ner() -> tuple[Any, Any, Any]:
     _configure_huggingface()
     path = MODEL_ROOT / "ner"
     if not (path / "config.json").is_file():
@@ -74,7 +74,7 @@ def _load_ner() -> tuple[Any, Any, torch.device]:
 
 
 @lru_cache(maxsize=2)
-def _load_t5(task: str) -> tuple[Any, Any, torch.device]:
+def _load_t5(task: str) -> tuple[Any, Any, Any]:
     _configure_huggingface()
     if task not in {"summarization", "question-generation"}:
         raise ValueError(f"Unsupported T5 task: {task}.")
@@ -95,7 +95,7 @@ def _load_t5(task: str) -> tuple[Any, Any, torch.device]:
 
 
 @lru_cache(maxsize=1)
-def _load_attention_model() -> tuple[Any, Any, torch.device]:
+def _load_attention_model() -> tuple[Any, Any, Any]:
     _configure_huggingface()
     path = MODEL_ROOT / "qa"
     if not (path / "config.json").is_file():
@@ -133,7 +133,9 @@ def _load_tokenizers() -> tuple[Any, Any, Any]:
         ) from error
 
 
-def _autocast(device: torch.device):
+def _autocast(device: Any):
+    import torch
+
     return torch.autocast(
         device_type="cuda",
         dtype=torch.float16,
@@ -142,6 +144,8 @@ def _autocast(device: torch.device):
 
 
 def clear_gpu_memory() -> None:
+    import torch
+
     """Release cached CUDA allocations after a reported inference OOM."""
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
@@ -150,6 +154,8 @@ def clear_gpu_memory() -> None:
 def answer_chunk(
     question: str, context: str, confidence_threshold: float
 ) -> dict[str, Any]:
+    import torch
+
     """Extract the highest-scoring answer span and preserve its character offsets."""
     if not question.strip() or not context.strip():
         raise ValueError("Question and context must be non-empty.")
@@ -203,6 +209,8 @@ def answer_chunk(
 
 
 def extract_entities(text: str) -> list[dict[str, Any]]:
+    import torch
+
     """Return entity text, BIO-merged label, and page-local character offsets."""
     if not text.strip():
         return []
@@ -249,6 +257,8 @@ def extract_entities(text: str) -> list[dict[str, Any]]:
 
 
 def summarize_text(text: str, decoding: str) -> str:
+    import torch
+
     """Generate a bounded summary with greedy or width-three beam decoding."""
     if not text.strip():
         raise ValueError("Text must be non-empty.")
@@ -272,6 +282,8 @@ def summarize_text(text: str, decoding: str) -> str:
 
 
 def generate_question(text: str, answer: str | None) -> str:
+    import torch
+
     """Generate one grounded question from context with an optional answer marker."""
     if not text.strip():
         raise ValueError("Text must be non-empty.")
@@ -357,6 +369,8 @@ def tokenizer_lab(text: str) -> dict[str, Any]:
 
 
 def attention_weights(text: str) -> dict[str, Any]:
+    import torch
+
     """Return per-layer/head DistilBERT self-attention for a short sentence."""
     if not text.strip():
         raise ValueError("Text must be non-empty.")
@@ -387,6 +401,8 @@ def attention_weights(text: str) -> dict[str, Any]:
 
 def sinusoidal_encoding(length: int, dimension: int) -> list[list[float]]:
     """Compute the classic sinusoidal position encodings from Transformer."""
+    import torch
+
     if not 1 <= length <= 512 or not 1 <= dimension <= 1024:
         raise ValueError("length must be 1..512 and dimension must be 1..1024.")
     positions = torch.arange(length, dtype=torch.float64).unsqueeze(1)

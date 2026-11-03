@@ -112,6 +112,16 @@ def test_answer_must_align_with_the_stem_sentence():
     )
 
 
+def test_readability_fallback_recognizes_inflected_verbs_without_spacy(monkeypatch):
+    from app.nlp import preprocessing
+
+    monkeypatch.setattr(preprocessing, "_spacy_model", lambda: None)
+    valid, reason, score = validate_stem(
+        "Which foundation maintains the Python language?"
+    )
+    assert (valid, reason, score) == (True, "readable", 1.0)
+
+
 def test_distractor_filters_aliases_substrings_and_wrong_types():
     assert not distractor_is_valid("Python", "Python language")
     assert not distractor_is_valid(

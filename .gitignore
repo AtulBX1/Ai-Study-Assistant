@@ -3,6 +3,9 @@
 .env.*
 !.env.example
 .pytest-tmp/
+.pytest-tmp*/
+pytest-run-*/
+.uv_cache*/
 # Python
 __pycache__/
 *.py[cod]

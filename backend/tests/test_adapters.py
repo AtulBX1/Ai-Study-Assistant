@@ -17,6 +17,8 @@ from app.services.file_storage import LocalFileStorage
 from app.services.job_queue import LocalJobQueue
 from app.services.vector_store import create_vector_store
 
+ALEMBIC_INI = Path(__file__).resolve().parent.parent / "alembic.ini"
+
 
 def test_local_job_queue_runs_registered_task() -> None:
     output: list[str] = []
@@ -131,7 +133,11 @@ def test_alembic_migrates_sqlite_database(
     monkeypatch.setenv("DATABASE_URL", database_url)
     get_settings.cache_clear()
     try:
-        command.upgrade(Config("alembic.ini"), "head")
+        config = Config(str(ALEMBIC_INI))
+        config.set_main_option(
+            "script_location", str(ALEMBIC_INI.parent / "alembic")
+        )
+        command.upgrade(config, "head")
         engine = create_engine(database_url)
         try:
             assert inspect(engine).has_table("alembic_version")
@@ -151,7 +157,10 @@ def test_alembic_generates_postgresql_offline_sql(
     )
     get_settings.cache_clear()
     try:
-        config = Config("alembic.ini")
+        config = Config(str(ALEMBIC_INI))
+        config.set_main_option(
+            "script_location", str(ALEMBIC_INI.parent / "alembic")
+        )
         output = StringIO()
         config.output_buffer = output
         command.upgrade(config, "head", sql=True)
