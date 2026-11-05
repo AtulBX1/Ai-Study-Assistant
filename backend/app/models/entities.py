@@ -10,6 +10,7 @@ from sqlalchemy import (
     Enum,
     Float,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
@@ -278,13 +279,28 @@ class AttemptAnswer(Base):
 
 class Flashcard(TimestampMixin, Base):
     __tablename__ = "flashcards"
+    __table_args__ = (
+        Index(
+            "uq_flashcards_owner_document_fact",
+            "owner_id",
+            "document_id",
+            "fact_key",
+            unique=True,
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     owner_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), index=True
     )
+    document_id: Mapped[int | None] = mapped_column(
+        ForeignKey("documents.id", ondelete="CASCADE"), index=True
+    )
     front: Mapped[str] = mapped_column(Text)
     back: Mapped[str] = mapped_column(Text)
+    source_page: Mapped[int | None] = mapped_column(Integer)
+    evidence_sentence: Mapped[str | None] = mapped_column(Text)
+    fact_key: Mapped[str | None] = mapped_column(String(64))
     ease: Mapped[float] = mapped_column(Float, default=2.5)
     interval: Mapped[int] = mapped_column(Integer, default=0)
     repetitions: Mapped[int] = mapped_column(Integer, default=0)
@@ -295,6 +311,58 @@ class Flashcard(TimestampMixin, Base):
     source_chunk_id: Mapped[int | None] = mapped_column(
         ForeignKey("chunks.id", ondelete="SET NULL")
     )
+    suspended: Mapped[bool] = mapped_column(Boolean, default=False)
+    review_logs: Mapped[list["FlashcardReviewLog"]] = relationship(
+        back_populates="flashcard", cascade="all, delete-orphan"
+    )
+
+
+class FlashcardReviewLog(Base):
+    __tablename__ = "review_log"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    flashcard_id: Mapped[int] = mapped_column(
+        ForeignKey("flashcards.id", ondelete="CASCADE"), index=True
+    )
+    owner_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    rating: Mapped[str] = mapped_column(String(16))
+    quality: Mapped[int] = mapped_column(Integer)
+    reviewed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now
+    )
+    interval: Mapped[int] = mapped_column(Integer)
+    ease: Mapped[float] = mapped_column(Float)
+    repetitions: Mapped[int] = mapped_column(Integer)
+    flashcard: Mapped[Flashcard] = relationship(back_populates="review_logs")
+
+
+class GlossaryTerm(TimestampMixin, Base):
+    __tablename__ = "glossary_terms"
+    __table_args__ = (
+        UniqueConstraint(
+            "owner_id",
+            "document_id",
+            "term_key",
+            name="uq_glossary_owner_doc_term",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    document_id: Mapped[int] = mapped_column(
+        ForeignKey("documents.id", ondelete="CASCADE"), index=True
+    )
+    term: Mapped[str] = mapped_column(String(255))
+    term_key: Mapped[str] = mapped_column(String(255))
+    definition: Mapped[str] = mapped_column(Text)
+    page: Mapped[int] = mapped_column(Integer)
+    evidence_sentence: Mapped[str] = mapped_column(Text)
+    source: Mapped[str] = mapped_column(String(32))
+    importance: Mapped[float] = mapped_column(Float, default=0.0)
 
 
 class StudyClass(TimestampMixin, Base):

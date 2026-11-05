@@ -20,6 +20,7 @@ from app.routers import (
     quizzes,
     rag_playground,
     search,
+    study,
     transformers,
 )
 from app.services.rag.providers import provider_cooldown_status
@@ -65,6 +66,7 @@ app.include_router(rag_playground.router)
 app.include_router(search.router)
 app.include_router(chat.router)
 app.include_router(quizzes.router)
+app.include_router(study.router)
 app.include_router(transformers.lab_router)
 app.include_router(transformers.documents_router)
 

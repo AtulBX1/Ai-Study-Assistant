@@ -1,0 +1,7 @@
+DEFINITION OF DONE (every step):
+ (1) implement only what the prompt lists;
+  (2) tests use fakes only: no .env, real keys, network, weights, GPU or real PDFs, and anything slow is marked slow;
+   (3) run `.\scripts\check.ps1` from the repo root (ruff check, ruff format --check, black --check, pytest) and paste its last 5 lines; if it does not print CHECK PASSED, fix and rerun until it does; never interrupt it, never use -x, never skip or delete tests;
+    (4) one Alembic head, and `upgrade head` works on an empty database;
+     (5) no __pycache__, .pyc or .pytest-tmp files committed;
+      (6) stop and report; do not start the next step.
