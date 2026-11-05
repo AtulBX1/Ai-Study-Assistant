@@ -259,9 +259,9 @@ def normalize_question_item(item: Any) -> dict[str, Any]:
     return {
         "question": str(question or "").strip(),
         "type": question_type,
-        "options": options
-        if question_type in {"multiple_choice", "true_false"}
-        else None,
+        "options": (
+            options if question_type in {"multiple_choice", "true_false"} else None
+        ),
         "correct_answer": str(answer or "").strip(),
         "evidence": evidence,
         "explanation": evidence,

@@ -500,9 +500,11 @@ class ProviderChain:
             "chain": [p.name for p in self.providers],
             "providers": {
                 p.name: {
-                    "cooldown_until": p.cooldown_until.isoformat()
-                    if getattr(p, "cooldown_until", None) and p.cooldown_until > now
-                    else None,
+                    "cooldown_until": (
+                        p.cooldown_until.isoformat()
+                        if getattr(p, "cooldown_until", None) and p.cooldown_until > now
+                        else None
+                    ),
                     "rpm_limit": getattr(p, "rpm_limit", None),
                     "tpm_limit": getattr(p, "tpm_limit", None),
                 }

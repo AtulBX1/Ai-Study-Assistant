@@ -303,14 +303,17 @@ def _resolve_llm(
             max_requests=max_requests,
             fallback_only_on_cooldown=True,
         )
-        return LLMEngine(
-            chain,
-            min_delay_seconds=20,
-            max_requests=max_requests,
-            parse_retries=2,
-            input_token_limit=settings.groq_quiz_input_token_limit,
-            output_token_cap=settings.groq_quiz_max_output_tokens,
-        ), None
+        return (
+            LLMEngine(
+                chain,
+                min_delay_seconds=20,
+                max_requests=max_requests,
+                parse_retries=2,
+                input_token_limit=settings.groq_quiz_input_token_limit,
+                output_token_cap=settings.groq_quiz_max_output_tokens,
+            ),
+            None,
+        )
     except (ProviderUnavailableError, ValueError):
         return None, "provider_unavailable"
 
