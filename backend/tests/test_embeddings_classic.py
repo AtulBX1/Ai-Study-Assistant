@@ -55,6 +55,7 @@ def _headers(user_id: int) -> dict[str, str]:
     return {"Authorization": f"Bearer {access_token_for(user_id)}"}
 
 
+@pytest.mark.slow
 def test_cbow_and_skipgram_save_distinct_models(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(embeddings_classic, "WORD2VEC_ROOT", tmp_path)
     cbow = embeddings_classic.train_word2vec(
@@ -74,6 +75,7 @@ def test_cbow_and_skipgram_save_distinct_models(tmp_path, monkeypatch) -> None:
     assert not np.array_equal(cbow_vectors["king"], skipgram_vectors["king"])
 
 
+@pytest.mark.slow
 def test_tiny_corpus_warns_and_empty_vocabulary_does_not_crash(
     tmp_path, monkeypatch
 ) -> None:
@@ -101,6 +103,7 @@ def test_tiny_corpus_warns_and_empty_vocabulary_does_not_crash(
     assert empty["saved"] is False
 
 
+@pytest.mark.slow
 def test_projection_returns_two_and_three_dimensional_coordinates(
     tmp_path, monkeypatch
 ) -> None:
@@ -260,6 +263,7 @@ def test_similar_words_oov_analogy_projection_and_ownership(
     assert denied.status_code == 404
 
 
+@pytest.mark.slow
 def test_word2vec_training_endpoint_and_retrieval_search(
     client, db_session, monkeypatch, tmp_path
 ) -> None:

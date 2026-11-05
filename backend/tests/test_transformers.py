@@ -129,6 +129,7 @@ def test_tokenizer_comparison_returns_tokens_ids_and_counts(monkeypatch) -> None
         assert tokenizer_output["emoji"]
 
 
+@pytest.mark.slow
 def test_missing_weights_fail_lazily_with_clear_message(tmp_path, monkeypatch) -> None:
     try:
         from transformers import AutoModelForQuestionAnswering  # noqa: F401

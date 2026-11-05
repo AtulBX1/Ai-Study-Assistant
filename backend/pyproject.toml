@@ -76,9 +76,10 @@ select = ["E", "F", "I", "UP", "B"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = [".", ".."]
+addopts = "-m 'not slow'"
 markers = [
     "allow_local_network: permits intentional local-only socket use in a test",
-    "slow: downloads or exercises large external embedding data",
+    "slow: trains models, downloads data, or takes more than five seconds",
     "gpu: uses CUDA when available",
     "download: downloads external dataset files",
     "training: fine-tunes a model and may run for many minutes",

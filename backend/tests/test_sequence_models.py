@@ -118,6 +118,7 @@ def test_gpu_telemetry_parses_nvidia_smi(
     }
 
 
+@pytest.mark.slow
 def test_tiny_dataset_overfits_near_perfectly(tmp_path: Path) -> None:
     set_seed(13)
     texts, labels = _examples()
@@ -152,6 +153,7 @@ def test_tiny_dataset_overfits_near_perfectly(tmp_path: Path) -> None:
     assert float(accuracy) >= 0.95
 
 
+@pytest.mark.slow
 def test_checkpoint_resume_and_early_stopping(tmp_path: Path) -> None:
     texts, labels = _examples()
     vocabulary = Vocabulary.build(texts, min_frequency=1)
@@ -186,6 +188,7 @@ def test_checkpoint_resume_and_early_stopping(tmp_path: Path) -> None:
     assert continued[0]["epoch"] == 3
 
 
+@pytest.mark.slow
 def test_gradient_clipping_is_applied(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -216,6 +219,7 @@ def test_gradient_clipping_is_applied(
     assert calls == [0.5, 0.5]
 
 
+@pytest.mark.slow
 def test_simulated_cuda_oom_has_actionable_guidance(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -239,6 +243,7 @@ def test_simulated_cuda_oom_has_actionable_guidance(
         trainer.fit(loader, loader, epochs=1)
 
 
+@pytest.mark.slow
 def test_character_lstm_teacher_forcing_and_truncated_bptt() -> None:
     model = CharacterLanguageModel(vocabulary_size=5, embedding_dim=4, hidden_size=6)
     sequence = torch.tensor([[0, 1, 2, 3, 4, 0, 1, 2]])

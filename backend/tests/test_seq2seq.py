@@ -123,6 +123,7 @@ def test_vocab_boundaries_and_padding() -> None:
     assert PAD_ID == 0
 
 
+@pytest.mark.slow
 def test_checkpoint_resume(tmp_path) -> None:
     vocabulary = Seq2SeqVocabulary.build(
         ["the small cat", "a long dog", "cat sits", "dog runs"], min_frequency=1

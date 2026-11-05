@@ -22,6 +22,7 @@ def test_sample_question_set_has_30_page_labeled_questions() -> None:
     )
 
 
+@pytest.mark.slow
 def test_real_question_set_is_editable_labeled_and_review_flagged() -> None:
     project_root = Path(__file__).resolve().parents[2]
     path = project_root / "data" / "eval" / "questions_real.json"
