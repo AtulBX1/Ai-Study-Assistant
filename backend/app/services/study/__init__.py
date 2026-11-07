@@ -1,5 +1,6 @@
 """Grounded study materials and spaced-repetition helpers."""
 
+from app.services.study.exports import ExportBlock, ExportDocument, generate_export
 from app.services.study.flashcards import generate_document_flashcards
 from app.services.study.glossary import (
     find_evidence_sentence,
@@ -7,6 +8,7 @@ from app.services.study.glossary import (
     normalize_term,
     regenerate_glossary,
 )
+from app.services.study.multi_document import answer_across_documents, compare_documents
 from app.services.study.notes import generate_chapter_notes, generate_cheat_sheet
 from app.services.study.sm2 import schedule_review
 from app.services.study.summaries import (
@@ -23,11 +25,16 @@ from app.services.study.summaries import (
 
 __all__ = [
     "DocumentSection",
+    "ExportBlock",
+    "ExportDocument",
+    "answer_across_documents",
+    "compare_documents",
     "extract_sections",
     "find_evidence_sentence",
     "generate_chapter_notes",
     "generate_cheat_sheet",
     "generate_document_flashcards",
+    "generate_export",
     "generate_document_summary",
     "get_summary_job_status",
     "grounded_custom_term",

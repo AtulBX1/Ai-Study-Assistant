@@ -14,7 +14,7 @@ from fastapi import (
     Query,
     Response,
 )
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import delete, func, or_, select
 from sqlalchemy.orm import Session
 
@@ -31,6 +31,7 @@ from app.models import (
     StudyPlanItem,
     User,
 )
+from app.routers.chat import get_rag_pipeline
 from app.services.job_queue import JobQueue, create_job_queue
 from app.services.rag.pipeline import RAGChatPipeline
 from app.services.rag.providers import ProviderError, ProviderUnavailableError
@@ -39,11 +40,16 @@ from app.services.study.concept_graph import (
     get_graph_node_detail,
     graph_definitions,
 )
+from app.services.study.exports import content_disposition, generate_export
 from app.services.study.flashcards import generate_document_flashcards
 from app.services.study.glossary import (
     grounded_custom_term,
     normalize_term,
     regenerate_glossary,
+)
+from app.services.study.multi_document import (
+    answer_across_documents,
+    compare_documents,
 )
 from app.services.study.notes import generate_chapter_notes, generate_cheat_sheet
 from app.services.study.planner import (
@@ -59,7 +65,23 @@ from app.services.study.summaries import (
 )
 
 router = APIRouter(prefix="/study", tags=["study"])
+export_router = APIRouter(tags=["exports"])
 AuthenticatedUser = Annotated[User, Depends(get_current_user)]
+RAGPipeline = Annotated[RAGChatPipeline, Depends(get_rag_pipeline)]
+
+
+class MultiDocumentQuestionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    question: str = Field(min_length=1, max_length=4000)
+    document_ids: list[int] = Field(min_length=1, max_length=20)
+    language: Literal["English", "Hindi", "Punjabi"] = "English"
+
+
+class DocumentComparisonRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    document_ids: list[int] = Field(min_length=2, max_length=2)
 
 
 class ReviewRating(StrEnum):
@@ -1197,3 +1219,114 @@ def regenerate_study_plan(
             )
     db.commit()
     return _plan_payload(db, plan)
+
+
+def _selected_documents(
+    db: Session,
+    *,
+    document_ids: list[int],
+    owner_id: int,
+    max_count: int,
+    allow_duplicates: bool = False,
+) -> list[Document]:
+    if len(document_ids) > max_count:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Select no more than {max_count} documents.",
+        )
+    if not allow_duplicates and len(set(document_ids)) != len(document_ids):
+        raise HTTPException(
+            status_code=422,
+            detail="Selected document IDs must be unique.",
+        )
+    documents = list(
+        db.scalars(
+            select(Document).where(
+                Document.owner_id == owner_id,
+                Document.id.in_(set(document_ids)),
+            )
+        )
+    )
+    if {document.id for document in documents} != set(document_ids):
+        raise HTTPException(status_code=404, detail="One or more documents not found.")
+    by_id = {document.id: document for document in documents}
+    return [by_id[document_id] for document_id in document_ids]
+
+
+@router.post("/multi-document/qa")
+def ask_across_documents(
+    request: MultiDocumentQuestionRequest,
+    db: DatabaseSession,
+    user: AuthenticatedUser,
+    pipeline: RAGPipeline,
+) -> dict[str, Any]:
+    """Answer one question from a bounded set of the user's documents."""
+    documents = _selected_documents(
+        db,
+        document_ids=request.document_ids,
+        owner_id=user.id,
+        max_count=get_settings().max_multi_document_count,
+    )
+    return answer_across_documents(
+        db,
+        pipeline=pipeline,
+        user_id=user.id,
+        document_ids=[document.id for document in documents],
+        question=request.question,
+        language=request.language,
+    )
+
+
+@router.post("/documents/compare")
+def compare_owned_documents(
+    request: DocumentComparisonRequest,
+    db: DatabaseSession,
+    user: AuthenticatedUser,
+) -> dict[str, Any]:
+    """Compare two owned documents using stored terms and section embeddings."""
+    documents = _selected_documents(
+        db,
+        document_ids=request.document_ids,
+        owner_id=user.id,
+        max_count=get_settings().max_multi_document_count,
+        allow_duplicates=True,
+    )
+    return compare_documents(
+        db,
+        document_a=documents[0],
+        document_b=documents[1],
+    )
+
+
+@export_router.get("/export/{kind}/{item_id}")
+def download_study_export(
+    kind: str,
+    item_id: int,
+    db: DatabaseSession,
+    user: AuthenticatedUser,
+    format: Annotated[str, Query()],
+    page_start: Annotated[int | None, Query(ge=1)] = None,
+    page_end: Annotated[int | None, Query(ge=1)] = None,
+    include_answers: bool = False,
+) -> Response:
+    """Generate an authenticated, owner-scoped study export in memory."""
+    try:
+        content, media_type, filename = generate_export(
+            db,
+            owner_id=user.id,
+            kind=kind,
+            item_id=item_id,
+            format=format,
+            page_start=page_start,
+            page_end=page_end,
+            include_answers=include_answers,
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={"Content-Disposition": content_disposition(filename)},
+    )

@@ -68,6 +68,7 @@ app.include_router(search.router)
 app.include_router(chat.router)
 app.include_router(quizzes.router)
 app.include_router(study.router)
+app.include_router(study.export_router)
 app.include_router(transformers.lab_router)
 app.include_router(transformers.documents_router)
 

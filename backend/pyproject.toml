@@ -39,6 +39,8 @@ dependencies = [
     "yake>=0.6,<1",
     "rouge-score>=0.1.2,<1",
     "sacrebleu>=2.5,<3",
+    "python-docx>=1.2,<2",
+    "reportlab>=5.1,<6",
 ]
 
 [dependency-groups]

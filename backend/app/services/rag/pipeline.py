@@ -287,7 +287,7 @@ class RAGChatPipeline:
         self, answer_text: str, chunks: list[dict[str, Any]]
     ) -> list[dict[str, Any]]:
         """Extract citations matching [document, p.N] from generated answer."""
-        citation_pattern = re.compile(r"\[([^,\]]+),\s*p\.?(\d+)\]", re.IGNORECASE)
+        citation_pattern = re.compile(r"\[([^\]]+),\s*p\.?(\d+)\]", re.IGNORECASE)
         found_matches = citation_pattern.findall(answer_text)
 
         citations: list[dict[str, Any]] = []
@@ -593,11 +593,12 @@ class RAGChatPipeline:
             "latency_ms": round(total_latency_ms, 2),
         }
         yield f"data: {json.dumps(final_payload)}\n\n"
-        trace_chat(
-            question=query,
-            answer=safe_answer,
-            provider=provider_label,
-            mode=mode,
-            grounding_score=grounding["grounding_score"],
-            settings=self.settings,
-        )
+        if not has_private_doc:
+            trace_chat(
+                question=query,
+                answer=safe_answer,
+                provider=provider_label,
+                mode=mode,
+                grounding_score=grounding["grounding_score"],
+                settings=self.settings,
+            )
