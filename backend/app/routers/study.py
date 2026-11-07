@@ -1,6 +1,7 @@
 """Authenticated, owner-scoped flashcard and grounded glossary endpoints."""
 
-from datetime import UTC, datetime, time, timedelta
+import json
+from datetime import UTC, date, datetime, time, timedelta
 from enum import StrEnum
 from typing import Annotated, Any, Literal
 from uuid import uuid4
@@ -14,9 +15,10 @@ from fastapi import (
     Response,
 )
 from pydantic import BaseModel, Field
-from sqlalchemy import func, or_, select
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.dependencies.auth import DatabaseSession, get_current_user
 from app.models import (
     Document,
@@ -25,9 +27,18 @@ from app.models import (
     Flashcard,
     FlashcardReviewLog,
     GlossaryTerm,
+    StudyPlan,
+    StudyPlanItem,
     User,
 )
 from app.services.job_queue import JobQueue, create_job_queue
+from app.services.rag.pipeline import RAGChatPipeline
+from app.services.rag.providers import ProviderError, ProviderUnavailableError
+from app.services.study.concept_graph import (
+    build_concept_graph,
+    get_graph_node_detail,
+    graph_definitions,
+)
 from app.services.study.flashcards import generate_document_flashcards
 from app.services.study.glossary import (
     grounded_custom_term,
@@ -35,6 +46,11 @@ from app.services.study.glossary import (
     regenerate_glossary,
 )
 from app.services.study.notes import generate_chapter_notes, generate_cheat_sheet
+from app.services.study.planner import (
+    MAX_PLAN_DOCUMENTS,
+    collect_study_topics,
+    generate_study_plan,
+)
 from app.services.study.sm2 import schedule_review
 from app.services.study.summaries import (
     generate_document_summary,
@@ -74,6 +90,80 @@ class GlossaryTermRequest(BaseModel):
     page: int | None = Field(default=None, ge=1)
 
 
+class StudyPlanRequest(BaseModel):
+    exam_date: date
+    daily_minutes: int = Field(ge=1, le=600)
+    document_ids: list[int] = Field(min_length=1, max_length=MAX_PLAN_DOCUMENTS)
+
+
+def _plan_payload(db: Session, plan: StudyPlan) -> dict[str, Any]:
+    items = list(
+        db.scalars(
+            select(StudyPlanItem)
+            .where(StudyPlanItem.plan_id == plan.id)
+            .order_by(StudyPlanItem.scheduled_date, StudyPlanItem.id)
+        )
+    )
+    grouped: dict[date, list[StudyPlanItem]] = {}
+    for item in items:
+        grouped.setdefault(item.scheduled_date, []).append(item)
+    if plan.start_date <= plan.exam_date:
+        days = []
+        current = plan.start_date
+        while current <= plan.exam_date:
+            day_items = grouped.get(current, [])
+            days.append(
+                {
+                    "date": current.isoformat(),
+                    "activities": [
+                        {
+                            "id": item.id,
+                            "activity_type": item.activity_type,
+                            "topic": item.topic,
+                            "document_id": item.document_id,
+                            "page_start": item.page_start,
+                            "page_end": item.page_end,
+                            "minutes": item.minutes,
+                            "is_done": item.is_done,
+                        }
+                        for item in day_items
+                    ],
+                    "total_minutes": sum(item.minutes for item in day_items),
+                }
+            )
+            current += timedelta(days=1)
+    else:
+        days = []
+    return {
+        "id": plan.id,
+        "exam_date": plan.exam_date.isoformat(),
+        "daily_minutes": plan.daily_minutes,
+        "document_ids": plan.document_ids,
+        "days": days,
+        "omitted_topics": plan.omitted_topics,
+    }
+
+
+def _persist_plan_activities(
+    db: Session, *, plan: StudyPlan, generated: dict[str, Any]
+) -> None:
+    for day in generated["days"]:
+        scheduled_date = date.fromisoformat(day["date"])
+        for activity in day["activities"]:
+            db.add(
+                StudyPlanItem(
+                    plan_id=plan.id,
+                    scheduled_date=scheduled_date,
+                    activity_type=activity["activity_type"],
+                    topic=activity["topic"],
+                    document_id=activity["document_id"],
+                    page_start=activity["page_start"],
+                    page_end=activity["page_end"],
+                    minutes=activity["minutes"],
+                )
+            )
+
+
 def _owned_document(db: Session, document_id: int, owner_id: int) -> Document:
     document = db.scalar(
         select(Document).where(
@@ -84,6 +174,74 @@ def _owned_document(db: Session, document_id: int, owner_id: int) -> Document:
     if document is None:
         raise HTTPException(status_code=404, detail="Document not found.")
     return document
+
+
+def _owned_plan(db: Session, plan_id: int, owner_id: int) -> StudyPlan:
+    plan = db.scalar(
+        select(StudyPlan).where(
+            StudyPlan.id == plan_id,
+            StudyPlan.owner_id == owner_id,
+        )
+    )
+    if plan is None:
+        raise HTTPException(status_code=404, detail="Study plan not found.")
+    return plan
+
+
+def _resolve_graph_scope(
+    db: Session,
+    *,
+    document_id: int,
+    chapter: str | None,
+    page_start: int | None,
+    page_end: int | None,
+) -> tuple[int | None, int | None]:
+    if chapter is None:
+        return page_start, page_end
+    if page_start is not None or page_end is not None:
+        raise HTTPException(
+            status_code=422,
+            detail="Use either chapter or page range, not both.",
+        )
+    pages = list(
+        db.scalars(
+            select(DocumentPage)
+            .where(DocumentPage.document_id == document_id)
+            .order_by(DocumentPage.page_number)
+        )
+    )
+    headings = [
+        (page.page_number, str(heading["text"]).strip())
+        for page in pages
+        for heading in page.headings or []
+        if isinstance(heading, dict)
+        and isinstance(heading.get("text"), str)
+        and heading["text"].strip()
+    ]
+    chapter_key = chapter.strip().casefold()
+    matches = [
+        index
+        for index, (_, title) in enumerate(headings)
+        if title.casefold() == chapter_key
+    ]
+    if not matches:
+        raise HTTPException(status_code=404, detail="Chapter not found.")
+    heading_index = matches[0]
+    start = headings[heading_index][0]
+    next_page = next(
+        (
+            heading_page
+            for heading_page, _ in headings[heading_index + 1 :]
+            if heading_page > start
+        ),
+        None,
+    )
+    end = (
+        next_page - 1
+        if next_page is not None
+        else max((page.page_number for page in pages), default=start)
+    )
+    return start, end
 
 
 def _owned_card(db: Session, card_id: int, owner_id: int) -> Flashcard:
@@ -750,3 +908,292 @@ def get_cheat_sheet(
         page_end=page_end,
     )
     return Response(content=cheat_sheet_md, media_type="text/markdown; charset=utf-8")
+
+
+@router.get("/documents/{document_id}/graph")
+def get_document_graph(
+    document_id: int,
+    db: DatabaseSession,
+    user: AuthenticatedUser,
+    chapter: Annotated[str | None, Query(max_length=255)] = None,
+    page_start: Annotated[int | None, Query(ge=1)] = None,
+    page_end: Annotated[int | None, Query(ge=1)] = None,
+    max_nodes: Annotated[int, Query(ge=1, le=200)] = 40,
+    label_relations: bool = False,
+) -> dict[str, Any]:
+    """Return a bounded, owner-scoped graph with copied page evidence."""
+    document = _owned_document(db, document_id, user.id)
+    page_start, page_end = _resolve_graph_scope(
+        db,
+        document_id=document.id,
+        chapter=chapter,
+        page_start=page_start,
+        page_end=page_end,
+    )
+    if page_start and page_end and page_start > page_end:
+        raise HTTPException(
+            status_code=422, detail="page_start must not exceed page_end."
+        )
+    provider = None
+    settings = get_settings()
+    if label_relations and not document.is_private:
+        candidate = RAGChatPipeline(settings=settings).provider
+        if not candidate.is_external or settings.allow_external_llm:
+            provider = candidate
+    try:
+        graph = build_concept_graph(
+            db,
+            document=document,
+            owner_id=user.id,
+            page_start=page_start,
+            page_end=page_end,
+            max_nodes=max_nodes,
+            relation_provider=provider,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=413, detail=str(exc)) from exc
+    except (ProviderError, ProviderUnavailableError, json.JSONDecodeError) as exc:
+        raise HTTPException(
+            status_code=502, detail="Optional relation labeling failed."
+        ) from exc
+    return graph
+
+
+@router.get("/documents/{document_id}/graph/nodes/{node_id}")
+def get_graph_node(
+    document_id: int,
+    node_id: str,
+    db: DatabaseSession,
+    user: AuthenticatedUser,
+    chapter: Annotated[str | None, Query(max_length=255)] = None,
+    page_start: Annotated[int | None, Query(ge=1)] = None,
+    page_end: Annotated[int | None, Query(ge=1)] = None,
+) -> dict[str, Any]:
+    """Return a graph node, its stored definition, and evidenced neighbours."""
+    document = _owned_document(db, document_id, user.id)
+    page_start, page_end = _resolve_graph_scope(
+        db,
+        document_id=document.id,
+        chapter=chapter,
+        page_start=page_start,
+        page_end=page_end,
+    )
+    if page_start and page_end and page_start > page_end:
+        raise HTTPException(
+            status_code=422, detail="page_start must not exceed page_end."
+        )
+    try:
+        graph = build_concept_graph(
+            db,
+            document=document,
+            owner_id=user.id,
+            page_start=page_start,
+            page_end=page_end,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=413, detail=str(exc)) from exc
+    detail = get_graph_node_detail(
+        graph,
+        node_id,
+        graph_definitions(
+            db,
+            document_id=document.id,
+            owner_id=user.id,
+            nodes=graph["nodes"],
+        ),
+    )
+    if detail is None:
+        raise HTTPException(status_code=404, detail="Graph node not found.")
+    return detail
+
+
+@router.post("/plans", status_code=201)
+def create_study_plan(
+    request: StudyPlanRequest,
+    db: DatabaseSession,
+    user: AuthenticatedUser,
+) -> dict[str, Any]:
+    """Create and persist a deterministic study plan for owned documents."""
+    if len(set(request.document_ids)) != len(request.document_ids):
+        raise HTTPException(status_code=422, detail="document_ids must be unique.")
+    today = date.today()
+    try:
+        topics = collect_study_topics(
+            db, owner_id=user.id, document_ids=request.document_ids
+        )
+        generated = generate_study_plan(
+            topics,
+            exam_date=request.exam_date,
+            daily_minutes=request.daily_minutes,
+            today=today,
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    plan = StudyPlan(
+        owner_id=user.id,
+        start_date=today,
+        exam_date=request.exam_date,
+        daily_minutes=request.daily_minutes,
+        document_ids=request.document_ids,
+        omitted_topics=generated["omitted_topics"],
+    )
+    db.add(plan)
+    db.flush()
+    _persist_plan_activities(db, plan=plan, generated=generated)
+    db.commit()
+    db.refresh(plan)
+    return _plan_payload(db, plan)
+
+
+@router.get("/plans/current")
+def get_current_study_plan(
+    db: DatabaseSession,
+    user: AuthenticatedUser,
+) -> dict[str, Any]:
+    """Get the most recently created plan for the authenticated user."""
+    plan = db.scalar(
+        select(StudyPlan)
+        .where(StudyPlan.owner_id == user.id)
+        .order_by(StudyPlan.created_at.desc(), StudyPlan.id.desc())
+        .limit(1)
+    )
+    if plan is None:
+        raise HTTPException(status_code=404, detail="Study plan not found.")
+    return _plan_payload(db, plan)
+
+
+@router.patch("/plans/{plan_id}/days/{scheduled_date}/done")
+def mark_study_day_done(
+    plan_id: int,
+    scheduled_date: date,
+    done: bool,
+    db: DatabaseSession,
+    user: AuthenticatedUser,
+) -> dict[str, Any]:
+    """Mark all activities on one owned plan date complete or incomplete."""
+    plan = _owned_plan(db, plan_id, user.id)
+    items = list(
+        db.scalars(
+            select(StudyPlanItem).where(
+                StudyPlanItem.plan_id == plan.id,
+                StudyPlanItem.scheduled_date == scheduled_date,
+            )
+        )
+    )
+    if not items:
+        raise HTTPException(status_code=404, detail="Study plan day not found.")
+    completed_at = datetime.now(UTC) if done else None
+    for item in items:
+        item.is_done = done
+        item.completed_at = completed_at
+    db.commit()
+    return _plan_payload(db, plan)
+
+
+@router.patch("/plans/{plan_id}/items/{item_id}/done")
+def mark_study_activity_done(
+    plan_id: int,
+    item_id: int,
+    done: bool,
+    db: DatabaseSession,
+    user: AuthenticatedUser,
+) -> dict[str, Any]:
+    """Mark one activity done only when both plan and item are owner-scoped."""
+    plan = _owned_plan(db, plan_id, user.id)
+    item = db.scalar(
+        select(StudyPlanItem).where(
+            StudyPlanItem.id == item_id,
+            StudyPlanItem.plan_id == plan.id,
+        )
+    )
+    if item is None:
+        raise HTTPException(status_code=404, detail="Study plan activity not found.")
+    item.is_done = done
+    item.completed_at = datetime.now(UTC) if done else None
+    db.commit()
+    return _plan_payload(db, plan)
+
+
+@router.post("/plans/{plan_id}/regenerate")
+def regenerate_study_plan(
+    plan_id: int,
+    db: DatabaseSession,
+    user: AuthenticatedUser,
+) -> dict[str, Any]:
+    """Rebuild future activities from today while keeping completed items."""
+    plan = _owned_plan(db, plan_id, user.id)
+    today = date.today()
+    if plan.exam_date < today:
+        raise HTTPException(status_code=422, detail="The plan exam date has passed.")
+    completed = list(
+        db.scalars(
+            select(StudyPlanItem).where(
+                StudyPlanItem.plan_id == plan.id,
+                StudyPlanItem.is_done.is_(True),
+            )
+        )
+    )
+    try:
+        topics = collect_study_topics(
+            db, owner_id=user.id, document_ids=plan.document_ids
+        )
+        generated = generate_study_plan(
+            topics,
+            exam_date=plan.exam_date,
+            daily_minutes=plan.daily_minutes,
+            today=today,
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    plan.start_date = min([today, *(item.scheduled_date for item in completed)])
+    plan.omitted_topics = generated["omitted_topics"]
+    db.execute(
+        delete(StudyPlanItem).where(
+            StudyPlanItem.plan_id == plan.id,
+            StudyPlanItem.is_done.is_(False),
+        )
+    )
+    completed_signatures = {
+        (
+            item.scheduled_date,
+            item.activity_type,
+            item.topic,
+            item.document_id,
+            item.page_start,
+            item.page_end,
+        )
+        for item in completed
+    }
+    for day in generated["days"]:
+        scheduled_date = date.fromisoformat(day["date"])
+        for activity in day["activities"]:
+            signature = (
+                scheduled_date,
+                activity["activity_type"],
+                activity["topic"],
+                activity["document_id"],
+                activity["page_start"],
+                activity["page_end"],
+            )
+            if signature in completed_signatures:
+                continue
+            db.add(
+                StudyPlanItem(
+                    plan_id=plan.id,
+                    scheduled_date=scheduled_date,
+                    activity_type=activity["activity_type"],
+                    topic=activity["topic"],
+                    document_id=activity["document_id"],
+                    page_start=activity["page_start"],
+                    page_end=activity["page_end"],
+                    minutes=activity["minutes"],
+                )
+            )
+    db.commit()
+    return _plan_payload(db, plan)

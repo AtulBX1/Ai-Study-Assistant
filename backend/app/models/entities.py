@@ -1,11 +1,12 @@
 """SQLAlchemy entities for persistence and ownership boundaries."""
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import Any
 
 from sqlalchemy import (
     JSON,
     Boolean,
+    Date,
     DateTime,
     Enum,
     Float,
@@ -384,6 +385,44 @@ class DocumentSummary(TimestampMixin, Base):
     content: Mapped[str] = mapped_column(Text)
     items: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
     generation_metadata: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+
+
+class StudyPlan(TimestampMixin, Base):
+    __tablename__ = "study_plans"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    start_date: Mapped[date] = mapped_column(Date)
+    exam_date: Mapped[date] = mapped_column(Date)
+    daily_minutes: Mapped[int] = mapped_column(Integer)
+    document_ids: Mapped[list[int]] = mapped_column(JSON, default=list)
+    omitted_topics: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
+    items: Mapped[list["StudyPlanItem"]] = relationship(
+        back_populates="plan", cascade="all, delete-orphan"
+    )
+
+
+class StudyPlanItem(Base):
+    __tablename__ = "plan_items"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    plan_id: Mapped[int] = mapped_column(
+        ForeignKey("study_plans.id", ondelete="CASCADE"), index=True
+    )
+    scheduled_date: Mapped[date] = mapped_column(Date)
+    activity_type: Mapped[str] = mapped_column(String(32))
+    topic: Mapped[str] = mapped_column(String(255))
+    document_id: Mapped[int | None] = mapped_column(
+        ForeignKey("documents.id", ondelete="SET NULL"), index=True
+    )
+    page_start: Mapped[int | None] = mapped_column(Integer)
+    page_end: Mapped[int | None] = mapped_column(Integer)
+    minutes: Mapped[int] = mapped_column(Integer)
+    is_done: Mapped[bool] = mapped_column(Boolean, default=False)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    plan: Mapped[StudyPlan] = relationship(back_populates="items")
 
 
 class StudyClass(TimestampMixin, Base):

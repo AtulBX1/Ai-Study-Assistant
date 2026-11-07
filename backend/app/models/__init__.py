@@ -20,6 +20,8 @@ from app.models.entities import (
     QuizAttempt,
     RefreshToken,
     StudyClass,
+    StudyPlan,
+    StudyPlanItem,
     TopicStat,
     User,
 )
@@ -44,6 +46,8 @@ __all__ = [
     "QuizAttempt",
     "RefreshToken",
     "StudyClass",
+    "StudyPlan",
+    "StudyPlanItem",
     "TopicStat",
     "User",
 ]
