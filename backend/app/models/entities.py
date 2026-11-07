@@ -365,6 +365,27 @@ class GlossaryTerm(TimestampMixin, Base):
     importance: Mapped[float] = mapped_column(Float, default=0.0)
 
 
+class DocumentSummary(TimestampMixin, Base):
+    __tablename__ = "document_summaries"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    document_id: Mapped[int] = mapped_column(
+        ForeignKey("documents.id", ondelete="CASCADE"), index=True
+    )
+    owner_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    summary_type: Mapped[str] = mapped_column(String(32), default="short")
+    engine_requested: Mapped[str] = mapped_column(String(32), default="extractive")
+    engine_used: Mapped[str] = mapped_column(String(32), default="extractive")
+    fallback_reason: Mapped[str | None] = mapped_column(Text)
+    page_start: Mapped[int | None] = mapped_column(Integer)
+    page_end: Mapped[int | None] = mapped_column(Integer)
+    content: Mapped[str] = mapped_column(Text)
+    items: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
+    generation_metadata: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+
+
 class StudyClass(TimestampMixin, Base):
     __tablename__ = "classes"
 

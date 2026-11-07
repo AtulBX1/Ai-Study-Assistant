@@ -2,9 +2,17 @@
 
 from datetime import UTC, datetime, time, timedelta
 from enum import StrEnum
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
+from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    HTTPException,
+    Query,
+    Response,
+)
 from pydantic import BaseModel, Field
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
@@ -13,18 +21,26 @@ from app.dependencies.auth import DatabaseSession, get_current_user
 from app.models import (
     Document,
     DocumentPage,
+    DocumentSummary,
     Flashcard,
     FlashcardReviewLog,
     GlossaryTerm,
     User,
 )
+from app.services.job_queue import JobQueue, create_job_queue
 from app.services.study.flashcards import generate_document_flashcards
 from app.services.study.glossary import (
     grounded_custom_term,
     normalize_term,
     regenerate_glossary,
 )
+from app.services.study.notes import generate_chapter_notes, generate_cheat_sheet
 from app.services.study.sm2 import schedule_review
+from app.services.study.summaries import (
+    generate_document_summary,
+    get_summary_job_status,
+    start_summary_job,
+)
 
 router = APIRouter(prefix="/study", tags=["study"])
 AuthenticatedUser = Annotated[User, Depends(get_current_user)]
@@ -501,3 +517,225 @@ def edit_custom_glossary_term(
     db.commit()
     db.refresh(term)
     return _glossary_payload(term)
+
+
+class SummaryRequest(BaseModel):
+    summary_type: Literal["short", "detailed", "chapter_wise"] = "short"
+    engine: Literal["extractive", "t5", "llm"] = "extractive"
+    page_start: int | None = Field(default=None, ge=1)
+    page_end: int | None = Field(default=None, ge=1)
+    regenerate: bool = False
+    run_async: bool = False
+
+
+def _summary_payload(summary: DocumentSummary) -> dict[str, Any]:
+    return {
+        "id": summary.id,
+        "document_id": summary.document_id,
+        "owner_id": summary.owner_id,
+        "summary_type": summary.summary_type,
+        "engine_requested": summary.engine_requested,
+        "engine_used": summary.engine_used,
+        "fallback_reason": summary.fallback_reason,
+        "page_start": summary.page_start,
+        "page_end": summary.page_end,
+        "content": summary.content,
+        "items": summary.items,
+        "created_at": summary.created_at,
+        "updated_at": summary.updated_at,
+    }
+
+
+def get_study_job_queue(background_tasks: BackgroundTasks) -> JobQueue:
+    """Resolve the queue and register summary job handler."""
+    return create_job_queue(
+        background_tasks,
+        {"generate_summary": start_summary_job},
+    )
+
+
+StudyJobQueue = Annotated[JobQueue, Depends(get_study_job_queue)]
+
+
+@router.post("/documents/{document_id}/summaries", status_code=201)
+def create_summary(
+    document_id: int,
+    request: SummaryRequest,
+    db: DatabaseSession,
+    user: AuthenticatedUser,
+    job_queue: StudyJobQueue,
+) -> dict[str, Any]:
+    """Generate or retrieve a grounded summary for an owned document."""
+    document = _owned_document(db, document_id, user.id)
+
+    if (
+        request.page_start
+        and request.page_end
+        and request.page_start > request.page_end
+    ):
+        raise HTTPException(
+            status_code=422, detail="page_start must not exceed page_end."
+        )
+
+    # Cache lookup if not explicitly regenerating
+    if not request.regenerate:
+        query = (
+            select(DocumentSummary)
+            .where(
+                DocumentSummary.document_id == document.id,
+                DocumentSummary.owner_id == user.id,
+                DocumentSummary.summary_type == request.summary_type,
+                DocumentSummary.engine_requested == request.engine,
+                DocumentSummary.page_start == request.page_start,
+                DocumentSummary.page_end == request.page_end,
+            )
+            .order_by(DocumentSummary.id.desc())
+        )
+        existing = db.scalar(query)
+        if existing:
+            return _summary_payload(existing)
+
+    if request.run_async:
+        job_id = str(uuid4())
+        job_queue.enqueue(
+            "generate_summary",
+            job_id,
+            db,
+            document.id,
+            user.id,
+            request.summary_type,
+            request.engine,
+            request.page_start,
+            request.page_end,
+        )
+        return {"job_id": job_id, "status": "queued"}
+
+    summary = generate_document_summary(
+        db,
+        document=document,
+        summary_type=request.summary_type,
+        engine=request.engine,
+        page_start=request.page_start,
+        page_end=request.page_end,
+    )
+    db.commit()
+    db.refresh(summary)
+    return _summary_payload(summary)
+
+
+@router.get("/documents/{document_id}/summaries")
+def list_document_summaries(
+    document_id: int,
+    db: DatabaseSession,
+    user: AuthenticatedUser,
+) -> list[dict[str, Any]]:
+    """List summaries generated for an owned document."""
+    _owned_document(db, document_id, user.id)
+    summaries = list(
+        db.scalars(
+            select(DocumentSummary)
+            .where(
+                DocumentSummary.document_id == document_id,
+                DocumentSummary.owner_id == user.id,
+            )
+            .order_by(DocumentSummary.id.desc())
+        )
+    )
+    return [_summary_payload(s) for s in summaries]
+
+
+@router.get("/summaries/{summary_id}")
+def get_summary(
+    summary_id: int,
+    db: DatabaseSession,
+    user: AuthenticatedUser,
+) -> dict[str, Any]:
+    """Get a specific summary by ID."""
+    summary = db.scalar(
+        select(DocumentSummary).where(
+            DocumentSummary.id == summary_id,
+            DocumentSummary.owner_id == user.id,
+        )
+    )
+    if summary is None:
+        raise HTTPException(status_code=404, detail="Summary not found.")
+    return _summary_payload(summary)
+
+
+@router.delete("/summaries/{summary_id}", status_code=204)
+def delete_summary(
+    summary_id: int,
+    db: DatabaseSession,
+    user: AuthenticatedUser,
+) -> None:
+    """Delete a summary by ID."""
+    summary = db.scalar(
+        select(DocumentSummary).where(
+            DocumentSummary.id == summary_id,
+            DocumentSummary.owner_id == user.id,
+        )
+    )
+    if summary is None:
+        raise HTTPException(status_code=404, detail="Summary not found.")
+    db.delete(summary)
+    db.commit()
+
+
+@router.get("/summaries/jobs/{job_id}")
+def get_summary_job(
+    job_id: str,
+    user: AuthenticatedUser,
+) -> dict[str, Any]:
+    """Retrieve async summary job status."""
+    status_info = get_summary_job_status(job_id)
+    if not status_info:
+        raise HTTPException(status_code=404, detail="Summary job not found.")
+    return {"job_id": job_id, **status_info}
+
+
+@router.get("/documents/{document_id}/notes")
+def get_chapter_notes(
+    document_id: int,
+    db: DatabaseSession,
+    user: AuthenticatedUser,
+    page_start: Annotated[int | None, Query(ge=1)] = None,
+    page_end: Annotated[int | None, Query(ge=1)] = None,
+) -> Response:
+    """Return rule-based chapter notes in Markdown."""
+    document = _owned_document(db, document_id, user.id)
+    if page_start and page_end and page_start > page_end:
+        raise HTTPException(
+            status_code=422, detail="page_start must not exceed page_end."
+        )
+
+    notes_md = generate_chapter_notes(
+        db,
+        document=document,
+        page_start=page_start,
+        page_end=page_end,
+    )
+    return Response(content=notes_md, media_type="text/markdown; charset=utf-8")
+
+
+@router.get("/documents/{document_id}/cheat-sheet")
+def get_cheat_sheet(
+    document_id: int,
+    db: DatabaseSession,
+    user: AuthenticatedUser,
+    page_start: Annotated[int | None, Query(ge=1)] = None,
+    page_end: Annotated[int | None, Query(ge=1)] = None,
+) -> Response:
+    """Return a rule-based one-page cheat sheet in Markdown."""
+    document = _owned_document(db, document_id, user.id)
+    if page_start and page_end and page_start > page_end:
+        raise HTTPException(
+            status_code=422, detail="page_start must not exceed page_end."
+        )
+
+    cheat_sheet_md = generate_cheat_sheet(
+        db,
+        document=document,
+        page_start=page_start,
+        page_end=page_end,
+    )
+    return Response(content=cheat_sheet_md, media_type="text/markdown; charset=utf-8")
