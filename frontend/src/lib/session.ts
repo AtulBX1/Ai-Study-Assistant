@@ -88,6 +88,14 @@ export function getCurrentUser(): User | null {
   return currentUser;
 }
 
+export function updateCurrentUserProfile(
+  profile: Partial<Pick<User, "public_handle" | "show_on_leaderboards">>,
+): void {
+  if (!currentUser) return;
+  currentUser = { ...currentUser, ...profile };
+  notifySessionChange();
+}
+
 export function isAuthenticated(): boolean {
   return accessToken !== null;
 }

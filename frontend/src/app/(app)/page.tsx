@@ -1,10 +1,5 @@
-import { ComingSoonPage } from "@/components/app/coming-soon-page";
+import { redirect } from "next/navigation";
 
 export default function LibraryPage() {
-  return (
-    <ComingSoonPage
-      title="Library"
-      description="Keep your course documents and study materials together."
-    />
-  );
+  redirect("/library");
 }

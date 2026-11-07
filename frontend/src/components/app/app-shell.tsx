@@ -27,7 +27,7 @@ import { cn } from "@/lib/utils";
 import type { ReactNode } from "react";
 
 const navigation = [
-  { label: "Library", href: "/", icon: Library },
+  { label: "Library", href: "/library", icon: Library },
   { label: "Chat", href: "/chat", icon: MessageSquareText },
   { label: "Quizzes", href: "/quizzes", icon: ClipboardList },
   { label: "Flashcards", href: "/flashcards", icon: Layers3 },

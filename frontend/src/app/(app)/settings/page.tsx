@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { ProfileSettings } from "@/components/settings/profile-settings";
 import { useMe } from "@/lib/hooks/use-me";
 import { logoutUser } from "@/lib/auth";
 
@@ -75,6 +76,9 @@ export default function SettingsPage() {
             </div>
           </CardContent>
         </Card>
+        <div className="lg:col-span-2">
+          <ProfileSettings />
+        </div>
       </div>
     </>
   );

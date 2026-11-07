@@ -72,7 +72,7 @@ test("registers and lands on the library placeholder", async ({ page }) => {
   await page.getByRole("button", { name: "Create account" }).click();
 
   await expect(page.getByRole("heading", { name: "Library", exact: true })).toBeVisible();
-  await expect(page.getByText("Library is coming soon")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Upload documents" })).toBeVisible();
 });
 
 test("redirects protected routes to login and returns after login", async ({ page }) => {

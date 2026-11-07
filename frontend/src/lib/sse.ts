@@ -1,6 +1,6 @@
 import { apiBaseUrl } from "@/lib/api";
 import { normalizeApiError } from "@/lib/errors";
-import { getAccessToken } from "@/lib/session";
+import { getAccessToken, refreshSession } from "@/lib/session";
 
 export type SSEEvent = {
   data: string;
@@ -97,11 +97,16 @@ export async function fetchSSE(
   signal: AbortSignal,
   onOpen?: () => void,
 ): Promise<void> {
-  const headers = new Headers({ Accept: "text/event-stream" });
-  const token = getAccessToken();
-  if (token) headers.set("Authorization", `Bearer ${token}`);
-
-  const response = await fetch(new URL(url, apiBaseUrl), { headers, signal });
+  const request = () => {
+    const headers = new Headers({ Accept: "text/event-stream" });
+    const token = getAccessToken();
+    if (token) headers.set("Authorization", `Bearer ${token}`);
+    return fetch(new URL(url, apiBaseUrl), { headers, signal });
+  };
+  let response = await request();
+  if (response.status === 401 && (await refreshSession())) {
+    response = await request();
+  }
   if (!response.ok) {
     let detail: unknown;
     const responseText = await response.text();
