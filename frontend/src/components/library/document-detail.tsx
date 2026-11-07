@@ -207,7 +207,7 @@ function DocumentActions({
   };
 
   const links = [
-    { href: "/chat", label: "Ask a question", icon: MessageSquareText },
+    { href: `/chat/${document.id}`, label: "Chat", icon: MessageSquareText },
     { href: "/quizzes", label: "Create a quiz", icon: Sparkles },
     { href: "/flashcards", label: "Review flashcards", icon: BookOpenText },
     { href: "/study-tools", label: "Study summary", icon: FileText },
@@ -216,14 +216,13 @@ function DocumentActions({
   return (
     <div className="space-y-5">
       <p className="text-sm text-muted-foreground">
-        These study areas are placeholders for later steps. The selected document
-        will be passed as a query parameter.
+        Open the document in chat or use another study tool with this document.
       </p>
       <div className="flex flex-wrap gap-2">
         {links.map(({ href, label, icon: Icon }) => (
           <Link
             key={href}
-            href={`${href}?document_id=${document.id}`}
+            href={href.includes("?") ? `${href}&document_id=${document.id}` : href}
             className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-border bg-background px-4 text-sm font-medium hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
             <Icon size={16} aria-hidden="true" />

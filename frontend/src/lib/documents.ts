@@ -22,7 +22,10 @@ export type KeyTerm = {
 
 export const DOCUMENT_PAGE_SIZE = 20;
 
-export async function listDocuments(offset: number, limit = DOCUMENT_PAGE_SIZE) {
+export async function listDocuments(
+  offset: number,
+  limit = DOCUMENT_PAGE_SIZE,
+): Promise<DocumentRecord[]> {
   const result = await apiClient.GET("/documents", {
     params: { query: { limit, offset } },
   });
@@ -121,8 +124,14 @@ export async function getDocumentKeyTerms(
   });
 }
 
-export async function downloadDocument(id: number): Promise<Blob> {
-  const response = await authorizedDocumentFetch(`/documents/${id}/download`);
+export async function downloadDocument(
+  id: number,
+  signal?: AbortSignal,
+): Promise<Blob> {
+  const response = await authorizedDocumentFetch(
+    `/documents/${id}/download`,
+    signal,
+  );
   if (!response.ok) {
     let detail: unknown;
     try {
@@ -135,14 +144,38 @@ export async function downloadDocument(id: number): Promise<Blob> {
   return response.blob();
 }
 
-async function authorizedDocumentFetch(path: string): Promise<Response> {
+export async function getDocumentPageImage(
+  id: number,
+  pageNumber: number,
+  signal?: AbortSignal,
+): Promise<Blob> {
+  const response = await authorizedDocumentFetch(
+    `/documents/${id}/pages/${pageNumber}/image`,
+    signal,
+  );
+  if (!response.ok) {
+    let detail: unknown;
+    try {
+      detail = await response.json();
+    } catch {
+      detail = undefined;
+    }
+    throw normalizeApiError(response.status, detail);
+  }
+  return response.blob();
+}
+
+async function authorizedDocumentFetch(
+  path: string,
+  signal?: AbortSignal,
+): Promise<Response> {
   const { apiBaseUrl } = await import("@/lib/api");
   const { getAccessToken, refreshSession } = await import("@/lib/session");
   const request = () => {
     const headers = new Headers();
     const token = getAccessToken();
     if (token) headers.set("Authorization", `Bearer ${token}`);
-    return fetch(`${apiBaseUrl}${path}`, { headers });
+    return fetch(`${apiBaseUrl}${path}`, { headers, signal });
   };
   let response = await request();
   if (response.status === 401 && (await refreshSession())) {

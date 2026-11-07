@@ -8,6 +8,12 @@ export type SSEEvent = {
   id?: string;
 };
 
+export type SSERequest = {
+  method?: "GET" | "POST";
+  body?: string;
+  key?: string;
+};
+
 function parseEventData(block: string): SSEEvent | null {
   const data: string[] = [];
   let event = "message";
@@ -96,16 +102,25 @@ export async function fetchSSE(
   onEvent: (event: SSEEvent) => void,
   signal: AbortSignal,
   onOpen?: () => void,
+  request: SSERequest = {},
 ): Promise<void> {
-  const request = () => {
+  const makeRequest = () => {
     const headers = new Headers({ Accept: "text/event-stream" });
+    if (request.body !== undefined) {
+      headers.set("Content-Type", "application/json");
+    }
     const token = getAccessToken();
     if (token) headers.set("Authorization", `Bearer ${token}`);
-    return fetch(new URL(url, apiBaseUrl), { headers, signal });
+    return fetch(new URL(url, apiBaseUrl), {
+      method: request.method ?? (request.body === undefined ? "GET" : "POST"),
+      headers,
+      ...(request.body === undefined ? {} : { body: request.body }),
+      signal,
+    });
   };
-  let response = await request();
+  let response = await makeRequest();
   if (response.status === 401 && (await refreshSession())) {
-    response = await request();
+    response = await makeRequest();
   }
   if (!response.ok) {
     let detail: unknown;

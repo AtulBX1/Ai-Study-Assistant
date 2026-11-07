@@ -3,6 +3,7 @@ import { AuthProvider } from "@/providers/auth-provider";
 import { QueryProvider } from "@/providers/query-provider";
 import { ThemeProvider } from "@/providers/theme-provider";
 import { Toast } from "@/components/ui/toast";
+import "pdfjs-dist/web/pdf_viewer.css";
 import "./globals.css";
 
 export const metadata: Metadata = {
