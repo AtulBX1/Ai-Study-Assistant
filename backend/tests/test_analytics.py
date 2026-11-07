@@ -5,7 +5,7 @@ from pathlib import Path
 
 from alembic.config import Config
 from alembic.script import ScriptDirectory
-from sqlalchemy import create_engine, inspect, select
+from sqlalchemy import create_engine, inspect, select, text
 
 from alembic import command
 from app.core.config import Settings, get_settings
@@ -609,6 +609,13 @@ def test_summary_and_weak_topics_endpoints_return_fake_fixture_sample(
     assert summary_response.status_code == 200
     assert summary_response.json()["attempts"] == 3
     assert summary_response.json()["average_score_percent"] == 76.67
+    assert summary_response.json()["versus_pool"] == {
+        "status": "pool too small",
+        "rank": None,
+        "percentile": None,
+        "score_vs_pool_mean_percent": None,
+        "tests": [],
+    }
     assert summary_response.json()["best_topic"]["topic"] == "Transformers"
     assert summary_response.json()["weakest_topic"]["topic"] == "RNN"
     assert weak_response.status_code == 200
@@ -618,7 +625,7 @@ def test_summary_and_weak_topics_endpoints_return_fake_fixture_sample(
     assert weak_topic["source_pages"] == [{"document_id": document.id, "page": 7}]
 
 
-def test_analytics_migration_is_the_single_head_and_upgrades_empty_database(
+def test_current_migration_is_the_single_head_and_upgrades_empty_database(
     tmp_path, monkeypatch
 ):
     database_path = tmp_path / "empty.db"
@@ -629,7 +636,7 @@ def test_analytics_migration_is_the_single_head_and_upgrades_empty_database(
 
     try:
         assert ScriptDirectory.from_config(alembic_config).get_heads() == [
-            "14a_student_analytics"
+            "14b_public_tests_and_handles"
         ]
         command.upgrade(alembic_config, "head")
         engine = create_engine(f"sqlite:///{database_path.as_posix()}")
@@ -638,11 +645,62 @@ def test_analytics_migration_is_the_single_head_and_upgrades_empty_database(
             assert "users" in inspector.get_table_names()
             assert "topic_stats" in inspector.get_table_names()
             assert {
+                "public_tests",
+                "public_test_attempts",
+                "public_test_reports",
+            } <= set(inspector.get_table_names())
+            assert not {
+                "classes",
+                "class_members",
+                "class_assignments",
+            } & set(inspector.get_table_names())
+            assert {
                 "timezone",
+                "public_handle",
+                "show_on_leaderboards",
+                "is_demo",
             } <= {column["name"] for column in inspector.get_columns("users")}
             assert {"accuracy", "last_seen"} <= {
                 column["name"] for column in inspector.get_columns("topic_stats")
             }
+        finally:
+            engine.dispose()
+    finally:
+        get_settings.cache_clear()
+
+
+def test_migration_removes_legacy_teacher_roles(tmp_path, monkeypatch) -> None:
+    database_path = tmp_path / "legacy.db"
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{database_path.as_posix()}")
+    monkeypatch.setitem(Settings.model_config, "env_file", None)
+    get_settings.cache_clear()
+    alembic_config = Config(str(Path(__file__).parents[1] / "alembic.ini"))
+    try:
+        command.upgrade(alembic_config, "14a_student_analytics")
+        engine = create_engine(f"sqlite:///{database_path.as_posix()}")
+        try:
+            with engine.begin() as connection:
+                connection.execute(
+                    text(
+                        "INSERT INTO users "
+                        "(id, email, full_name, password_hash, role, is_active, "
+                        "timezone, created_at, updated_at) "
+                        "VALUES (1, 'former-teacher@example.test', 'Former teacher', "
+                        "'unused', 'teacher', 1, 'UTC', "
+                        "'2026-11-07 00:00:00', '2026-11-07 00:00:00')"
+                    )
+                )
+        finally:
+            engine.dispose()
+        command.upgrade(alembic_config, "head")
+        engine = create_engine(f"sqlite:///{database_path.as_posix()}")
+        try:
+            with engine.connect() as connection:
+                role, handle = connection.execute(
+                    text("SELECT role, public_handle FROM users WHERE id = 1")
+                ).one()
+            assert role == "student"
+            assert handle.startswith("learner-")
         finally:
             engine.dispose()
     finally:

@@ -35,6 +35,15 @@ class UserResponse(BaseModel):
     email: str
     full_name: str
     role: str
+    public_handle: str
+    show_on_leaderboards: bool
+
+
+class PublicProfileUpdate(BaseModel):
+    public_handle: str | None = Field(
+        default=None, min_length=3, max_length=20, pattern=r"^[A-Za-z0-9_-]+$"
+    )
+    show_on_leaderboards: bool | None = None
 
 
 class TokenResponse(BaseModel):

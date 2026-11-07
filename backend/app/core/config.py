@@ -28,6 +28,11 @@ class Settings(BaseSettings):
     refresh_token_days: int = 7
     rate_limit_ip_per_minute: int = 120
     rate_limit_user_per_minute: int = 60
+    public_test_pool_minimum: int = Field(default=10, ge=1)
+    public_test_min_seconds_per_question: int = Field(default=3, ge=1)
+    public_test_daily_submission_cap: int = Field(default=20, ge=1)
+    public_test_start_limit_per_minute: int = Field(default=10, ge=1)
+    public_test_report_limit_per_minute: int = Field(default=5, ge=1)
     qdrant_url: str | None = None
     qdrant_api_key: str | None = None
     qdrant_local_path: str = str(PROJECT_ROOT / "data" / "qdrant")

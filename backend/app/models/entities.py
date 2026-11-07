@@ -1,5 +1,6 @@
 """SQLAlchemy entities for persistence and ownership boundaries."""
 
+import secrets
 from datetime import UTC, date, datetime
 from typing import Any
 
@@ -16,6 +17,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -25,6 +27,11 @@ from app.core.database import Base
 def utc_now() -> datetime:
     """Return a timezone-aware UTC timestamp."""
     return datetime.now(UTC)
+
+
+def _default_public_handle() -> str:
+    """Create an anonymous handle for a new account."""
+    return f"learner-{secrets.randbelow(9000) + 1000}"
 
 
 class TimestampMixin:
@@ -48,7 +55,6 @@ class User(TimestampMixin, Base):
     role: Mapped[str] = mapped_column(
         Enum(
             "student",
-            "teacher",
             "admin",
             name="user_role",
             native_enum=False,
@@ -57,7 +63,18 @@ class User(TimestampMixin, Base):
         default="student",
     )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    is_demo: Mapped[bool] = mapped_column(Boolean, default=False)
     timezone: Mapped[str] = mapped_column(String(64), default="UTC")
+    public_handle: Mapped[str] = mapped_column(
+        String(20), default=_default_public_handle
+    )
+    show_on_leaderboards: Mapped[bool] = mapped_column(Boolean, default=True)
+    public_handle_changed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
+    __table_args__ = (
+        Index("uq_users_public_handle_lower", func.lower(public_handle), unique=True),
+    )
 
 
 class RefreshToken(Base):
@@ -216,6 +233,7 @@ class Quiz(TimestampMixin, Base):
     )
     engine: Mapped[str] = mapped_column(String(16), default="classic")
     generation_report: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    is_demo: Mapped[bool] = mapped_column(Boolean, default=False)
     questions: Mapped[list["Question"]] = relationship(
         back_populates="quiz", cascade="all, delete-orphan"
     )
@@ -426,54 +444,6 @@ class StudyPlanItem(Base):
     plan: Mapped[StudyPlan] = relationship(back_populates="items")
 
 
-class StudyClass(TimestampMixin, Base):
-    __tablename__ = "classes"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    teacher_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"), index=True
-    )
-    name: Mapped[str] = mapped_column(String(255))
-    description: Mapped[str | None] = mapped_column(Text)
-    members: Mapped[list["ClassMember"]] = relationship(
-        back_populates="study_class", cascade="all, delete-orphan"
-    )
-    assignments: Mapped[list["ClassAssignment"]] = relationship(
-        back_populates="study_class", cascade="all, delete-orphan"
-    )
-
-
-class ClassMember(Base):
-    __tablename__ = "class_members"
-    __table_args__ = (UniqueConstraint("class_id", "student_id"),)
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    class_id: Mapped[int] = mapped_column(
-        ForeignKey("classes.id", ondelete="CASCADE"), index=True
-    )
-    student_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"), index=True
-    )
-    joined_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now
-    )
-    study_class: Mapped[StudyClass] = relationship(back_populates="members")
-
-
-class ClassAssignment(Base):
-    __tablename__ = "class_assignments"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    class_id: Mapped[int] = mapped_column(
-        ForeignKey("classes.id", ondelete="CASCADE"), index=True
-    )
-    created_by: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
-    title: Mapped[str] = mapped_column(String(255))
-    instructions: Mapped[str | None] = mapped_column(Text)
-    due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    study_class: Mapped[StudyClass] = relationship(back_populates="assignments")
-
-
 class TopicStat(Base):
     __tablename__ = "topic_stats"
     __table_args__ = (UniqueConstraint("owner_id", "topic"),)
@@ -491,4 +461,71 @@ class TopicStat(Base):
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, onupdate=utc_now
+    )
+
+
+class PublicTest(TimestampMixin, Base):
+    __tablename__ = "public_tests"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    title: Mapped[str] = mapped_column(String(255))
+    description: Mapped[str | None] = mapped_column(Text)
+    subject: Mapped[str] = mapped_column(String(120), index=True)
+    topic_labels: Mapped[list[str]] = mapped_column(JSON, default=list)
+    time_limit_seconds: Mapped[int] = mapped_column(Integer)
+    question_count: Mapped[int] = mapped_column(Integer)
+    snapshot: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
+    status: Mapped[str] = mapped_column(String(16), default="pending", index=True)
+    created_by: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    source_quiz_id: Mapped[int | None] = mapped_column(
+        ForeignKey("quizzes.id", ondelete="SET NULL")
+    )
+    is_demo: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class PublicTestAttempt(Base):
+    __tablename__ = "public_test_attempts"
+    __table_args__ = (
+        Index("ix_public_test_attempts_pool", "test_id", "completed_at"),
+        UniqueConstraint("submission_token_hash"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    test_id: Mapped[int] = mapped_column(
+        ForeignKey("public_tests.id", ondelete="CASCADE"), index=True
+    )
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    shuffled_order: Mapped[list[int]] = mapped_column(JSON, default=list)
+    saved_answers: Mapped[dict[str, str]] = mapped_column(JSON, default=dict)
+    graded_answers: Mapped[dict[str, bool]] = mapped_column(JSON, default=dict)
+    score_percent: Mapped[float | None] = mapped_column(Float)
+    correct_count: Mapped[int | None] = mapped_column(Integer)
+    elapsed_seconds: Mapped[int | None] = mapped_column(Integer)
+    is_first_completed: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_suspicious: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_late: Mapped[bool] = mapped_column(Boolean, default=False)
+    submission_token_hash: Mapped[str] = mapped_column(String(64))
+    is_demo: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class PublicTestReport(Base):
+    __tablename__ = "public_test_reports"
+    __table_args__ = (UniqueConstraint("test_id", "reporter_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    test_id: Mapped[int] = mapped_column(
+        ForeignKey("public_tests.id", ondelete="CASCADE"), index=True
+    )
+    reporter_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    reason: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now
     )

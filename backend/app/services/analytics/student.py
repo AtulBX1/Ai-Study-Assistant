@@ -21,6 +21,7 @@ from app.models import (
     QuizAttempt,
     TopicStat,
 )
+from app.services.public_tests import pool_summary
 
 DEFAULT_WEAK_THRESHOLD_PERCENT = 60.0
 DEFAULT_SECONDS_PER_CARD = 30
@@ -457,6 +458,7 @@ def summary(
         if history
         else 0.0
     )
+    pool = pool_summary(db, owner_id=owner_id)
     return {
         "label": "Student analytics summary",
         "units": {
@@ -471,4 +473,5 @@ def summary(
         "weakest_topic": weakest,
         "streak": streak,
         "cards_due": card_counts["cards_due"],
+        "versus_pool": pool,
     }

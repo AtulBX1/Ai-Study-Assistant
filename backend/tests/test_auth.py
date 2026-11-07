@@ -24,6 +24,8 @@ def test_register_login_refresh_and_logout(client: TestClient, db_session) -> No
     assert registration.status_code == 201
     initial = registration.json()
     assert initial["user"]["role"] == "student"
+    assert initial["user"]["public_handle"].startswith("learner-")
+    assert initial["user"]["show_on_leaderboards"] is True
     user = db_session.scalar(select(User).where(User.email == "learner@example.com"))
     assert user is not None
     assert user.password_hash.startswith("$argon2id$")
@@ -92,7 +94,9 @@ def test_expired_access_token_is_rejected(client: TestClient) -> None:
     assert response.status_code == 401
 
 
-def test_student_cannot_access_teacher_routes(client: TestClient, db_session) -> None:
+def test_student_cannot_access_admin_public_test_controls(
+    client: TestClient, db_session
+) -> None:
     student = User(
         email="student-role@example.com",
         full_name="Student",
@@ -104,7 +108,7 @@ def test_student_cannot_access_teacher_routes(client: TestClient, db_session) ->
     login_token = access_token_for(student.id)
 
     response = client.get(
-        "/classes",
+        "/public-tests/admin/queue",
         headers={"Authorization": f"Bearer {login_token}"},
     )
     assert response.status_code == 403

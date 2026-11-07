@@ -1,5 +1,6 @@
 """Registration and JWT authentication endpoints."""
 
+import secrets
 from datetime import timedelta
 from typing import Annotated
 
@@ -11,19 +12,23 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.core.database import get_db
 from app.core.security import create_token, decode_token, hash_password, verify_password
+from app.dependencies.auth import get_current_user
 from app.models import RefreshToken, User
 from app.models.entities import utc_now
 from app.schemas.auth import (
     LoginRequest,
     LogoutRequest,
+    PublicProfileUpdate,
     RefreshRequest,
     RegisterRequest,
     TokenResponse,
     UserResponse,
 )
+from app.services.public_tests import change_public_handle
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
 DatabaseSession = Annotated[Session, Depends(get_db)]
+AuthenticatedUser = Annotated[User, Depends(get_current_user)]
 
 
 def user_response(user: User) -> UserResponse:
@@ -32,6 +37,8 @@ def user_response(user: User) -> UserResponse:
         email=user.email,
         full_name=user.full_name,
         role=user.role,
+        public_handle=user.public_handle,
+        show_on_leaderboards=user.show_on_leaderboards,
     )
 
 
@@ -70,11 +77,13 @@ def register(payload: RegisterRequest, db: DatabaseSession) -> TokenResponse:
     existing = db.scalar(select(User).where(User.email == payload.email))
     if existing is not None:
         raise HTTPException(status_code=409, detail="Email is already registered.")
+    public_handle = _new_default_handle(db)
     user = User(
         email=payload.email,
         full_name=payload.full_name.strip(),
         password_hash=hash_password(payload.password),
         role="student",
+        public_handle=public_handle,
     )
     db.add(user)
     try:
@@ -86,6 +95,60 @@ def register(payload: RegisterRequest, db: DatabaseSession) -> TokenResponse:
             status_code=409, detail="Email is already registered."
         ) from exc
     return result
+
+
+def _new_default_handle(db: Session) -> str:
+    """Choose an unused anonymous learner handle."""
+    for _ in range(100):
+        candidate = f"learner-{secrets.randbelow(9000) + 1000}"
+        if (
+            db.scalar(select(User.id).where(User.public_handle.ilike(candidate)))
+            is None
+        ):
+            return candidate
+    raise HTTPException(status_code=503, detail="Could not allocate a public handle.")
+
+
+@router.get("/profile")
+def get_public_profile(user: AuthenticatedUser) -> dict[str, object]:
+    """Return only the caller's public-facing profile settings."""
+    return {
+        "public_handle": user.public_handle,
+        "show_on_leaderboards": user.show_on_leaderboards,
+    }
+
+
+@router.patch("/profile")
+def update_public_profile(
+    payload: PublicProfileUpdate,
+    db: DatabaseSession,
+    user: AuthenticatedUser,
+) -> dict[str, object]:
+    """Update the public handle and/or leaderboard visibility."""
+    if not payload.model_fields_set:
+        raise HTTPException(status_code=422, detail="No profile fields supplied.")
+    if (
+        "public_handle" in payload.model_fields_set and payload.public_handle is None
+    ) or (
+        "show_on_leaderboards" in payload.model_fields_set
+        and payload.show_on_leaderboards is None
+    ):
+        raise HTTPException(status_code=422, detail="Profile values cannot be null.")
+    if payload.public_handle is not None:
+        change_public_handle(db, user, payload.public_handle)
+    if payload.show_on_leaderboards is not None:
+        user.show_on_leaderboards = payload.show_on_leaderboards
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=409, detail="Public handle is unavailable."
+        ) from exc
+    return {
+        "public_handle": user.public_handle,
+        "show_on_leaderboards": user.show_on_leaderboards,
+    }
 
 
 @router.post("/login", response_model=TokenResponse)

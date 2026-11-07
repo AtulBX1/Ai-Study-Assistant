@@ -15,9 +15,9 @@ from app.routers import (
     analytics,
     auth,
     chat,
-    classes,
     documents,
     lab,
+    public_tests,
     quizzes,
     rag_playground,
     search,
@@ -47,6 +47,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 rate_limit_cache = create_cache(settings)
+app.state.rate_limit_cache = rate_limit_cache
 app.add_middleware(RequestIdMiddleware)
 app.add_middleware(
     RateLimitMiddleware,
@@ -63,12 +64,12 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(analytics.router)
 app.include_router(documents.router)
-app.include_router(classes.router)
 app.include_router(lab.router)
 app.include_router(rag_playground.router)
 app.include_router(search.router)
 app.include_router(chat.router)
 app.include_router(quizzes.router)
+app.include_router(public_tests.router)
 app.include_router(study.router)
 app.include_router(study.export_router)
 app.include_router(transformers.lab_router)
