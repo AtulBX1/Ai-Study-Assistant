@@ -1,6 +1,7 @@
 """Authenticated, owner-scoped quiz generation and attempt endpoints."""
 
 from collections import Counter, defaultdict
+from datetime import UTC, datetime
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
@@ -60,6 +61,28 @@ def _quiz_or_404(db: Session, quiz_id: int, owner_id: int) -> Quiz:
     if quiz is None:
         raise HTTPException(status_code=404, detail="Quiz not found.")
     return quiz
+
+
+def _source_topic(
+    question: Question,
+    chunks: dict[int, Chunk],
+    terms_by_document: dict[int, list[DocumentKeyTerm]],
+) -> str:
+    """Prefer a source section or key term to a generated topic label."""
+    chunk = chunks.get(question.source_chunk_id)
+    if chunk is not None:
+        section = (chunk.section or "").strip()
+        if section:
+            return section
+        matching_terms = [
+            term.term
+            for term in terms_by_document.get(chunk.doc_id, [])
+            if chunk.page_start <= term.page <= chunk.page_end
+            and term.term.casefold() in chunk.text.casefold()
+        ]
+        if matching_terms:
+            return max(matching_terms, key=lambda value: (len(value), value.casefold()))
+    return question.topic or "General"
 
 
 def _provider() -> Any:
@@ -444,7 +467,65 @@ def submit_answers(
         raise HTTPException(
             status_code=422, detail="Answer contains a question outside this quiz."
         )
+    if len({item.question_id for item in request.answers}) != len(request.answers):
+        raise HTTPException(
+            status_code=422, detail="Each question may be answered only once."
+        )
     existing = {item.question_id: item for item in attempt.answers}
+    chunk_ids = {
+        item.source_chunk_id
+        for item in questions.values()
+        if item.source_chunk_id is not None
+    }
+    source_chunks = (
+        {
+            chunk.id: chunk
+            for chunk in db.scalars(select(Chunk).where(Chunk.id.in_(chunk_ids)))
+        }
+        if chunk_ids
+        else {}
+    )
+    document_ids = {chunk.doc_id for chunk in source_chunks.values()}
+    terms_by_document: dict[int, list[DocumentKeyTerm]] = defaultdict(list)
+    if document_ids:
+        for term in db.scalars(
+            select(DocumentKeyTerm).where(DocumentKeyTerm.document_id.in_(document_ids))
+        ):
+            terms_by_document[term.document_id].append(term)
+    if attempt.completed_at is not None:
+        stored_results = []
+        previous_by_topic: dict[str, list[bool]] = defaultdict(list)
+        for item in attempt.answers:
+            question = questions.get(item.question_id)
+            if question is None or item.is_correct is None:
+                continue
+            metadata = question.options if isinstance(question.options, dict) else {}
+            stored_results.append(
+                {
+                    "question_id": item.question_id,
+                    "is_correct": item.is_correct,
+                    "correct_answer": question.answer,
+                    "explanation": question.explanation,
+                    "source_page_url": (
+                        f"/documents/{metadata.get('document_id', '')}"
+                        f"/pages/{question.page}"
+                    ),
+                }
+            )
+            previous_by_topic[
+                _source_topic(question, source_chunks, terms_by_document)
+            ].append(item.is_correct)
+        return {
+            "attempt_id": attempt.id,
+            "score": attempt.score,
+            "correct": sum(item["is_correct"] for item in stored_results),
+            "total": len(stored_results),
+            "topic_breakdown": {
+                topic: {"correct": sum(outcomes), "total": len(outcomes)}
+                for topic, outcomes in previous_by_topic.items()
+            },
+            "results": stored_results,
+        }
     results = []
     by_topic: dict[str, list[bool]] = defaultdict(list)
     rubric_provider = None
@@ -501,7 +582,9 @@ def submit_answers(
             record = AttemptAnswer(attempt_id=attempt.id, question_id=question.id)
             db.add(record)
         record.answer, record.is_correct = submitted.answer, is_correct
-        by_topic[question.topic].append(is_correct)
+        by_topic[_source_topic(question, source_chunks, terms_by_document)].append(
+            is_correct
+        )
         results.append(
             {
                 "question_id": question.id,
@@ -517,6 +600,7 @@ def submit_answers(
     total = len(request.answers)
     score = sum(item["is_correct"] for item in results) / total if total else 0
     attempt.score = score
+    attempt.completed_at = datetime.now(UTC)
     for topic, outcomes in by_topic.items():
         stat = db.scalar(
             select(TopicStat).where(
@@ -528,6 +612,8 @@ def submit_answers(
             db.add(stat)
         stat.attempts += len(outcomes)
         stat.correct += sum(outcomes)
+        stat.accuracy = stat.correct / stat.attempts
+        stat.last_seen = attempt.completed_at
     db.commit()
     return {
         "attempt_id": attempt.id,

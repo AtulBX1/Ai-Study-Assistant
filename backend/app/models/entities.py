@@ -57,6 +57,7 @@ class User(TimestampMixin, Base):
         default="student",
     )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    timezone: Mapped[str] = mapped_column(String(64), default="UTC")
 
 
 class RefreshToken(Base):
@@ -484,6 +485,10 @@ class TopicStat(Base):
     topic: Mapped[str] = mapped_column(String(255))
     attempts: Mapped[int] = mapped_column(Integer, default=0)
     correct: Mapped[int] = mapped_column(Integer, default=0)
+    accuracy: Mapped[float] = mapped_column(Float, default=0.0)
+    last_seen: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now
+    )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, onupdate=utc_now
     )

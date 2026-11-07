@@ -12,6 +12,7 @@ from app.core.config import get_settings
 from app.logging_config import configure_logging
 from app.middleware import RateLimitMiddleware, RequestIdMiddleware
 from app.routers import (
+    analytics,
     auth,
     chat,
     classes,
@@ -60,6 +61,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.include_router(auth.router)
+app.include_router(analytics.router)
 app.include_router(documents.router)
 app.include_router(classes.router)
 app.include_router(lab.router)
