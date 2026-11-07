@@ -45,10 +45,11 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
+rate_limit_cache = create_cache(settings)
 app.add_middleware(RequestIdMiddleware)
 app.add_middleware(
     RateLimitMiddleware,
-    cache=create_cache(settings),
+    cache=rate_limit_cache,
     settings=settings,
 )
 app.add_middleware(

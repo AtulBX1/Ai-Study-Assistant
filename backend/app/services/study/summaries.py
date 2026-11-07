@@ -8,13 +8,14 @@ import re
 from collections import Counter
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from hashlib import sha256
 from pathlib import Path
 from typing import Any, Literal
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.config import PROJECT_ROOT
+from app.core.config import PROJECT_ROOT, get_settings
 from app.models import Document, DocumentPage, DocumentSummary
 from app.services.rag.providers import (
     LLMProvider,
@@ -29,11 +30,13 @@ EngineType = Literal["extractive", "t5", "llm"]
 PROMPT_VERSION = "v1"
 T5_WEIGHTS_DIR = PROJECT_ROOT / "models" / "transformers" / "t5-summarization"
 
-_SENTENCE_SPLIT_REGEX = re.compile(r"(?<=[.!?])\s+(?=[A-Z0-9\"'(\[])")
+_SENTENCE_SPLIT_REGEX = re.compile(r"(?:(?<=[.!?])|(?<=[.!?][\"')\]]))\s+")
+_INITIALISM_REGEX = re.compile(r"\b(?:[A-Za-z]\.){2,}")
 _BULLET_PREFIX_REGEX = re.compile(r"^[-*•\d+.)]\s*")
 _TOC_LINE_REGEX = re.compile(
     r"(\.{3,}|_{3,}|\-{3,}|\t|\s{4,})\s*(?:page\s*)?\d+\s*$", re.IGNORECASE
 )
+OCR_PLACEHOLDER_REGEX = re.compile(r"<\s*num\s*>|\[table\b", re.IGNORECASE)
 _STOPWORDS = {
     "a",
     "about",
@@ -246,9 +249,12 @@ def split_sentences(text: str) -> list[str]:
     lines = [line.strip() for line in text.splitlines() if line.strip()]
     sentences: list[str] = []
     for line in lines:
-        parts = _SENTENCE_SPLIT_REGEX.split(line)
+        protected_line = _INITIALISM_REGEX.sub(
+            lambda match: match.group().replace(".", "\x00"), line
+        )
+        parts = _SENTENCE_SPLIT_REGEX.split(protected_line)
         for part in parts:
-            part = part.strip()
+            part = part.replace("\x00", ".").strip()
             if part:
                 sentences.append(part)
     return sentences
@@ -281,11 +287,7 @@ def is_content_chunk(text: str) -> bool:
         words = stripped_line.split()
 
         # A full sentence starts with uppercase and ends with sentence punctuation
-        if (
-            len(words) >= 4
-            and stripped_line[0].isupper()
-            and stripped_line[-1] in ".!?"
-        ):
+        if len(words) >= 4 and stripped_line[-1] in ".!?":
             full_sentence_words += len(words)
         else:
             bullet_fragments += 1
@@ -448,7 +450,12 @@ def summarize_extractive(
 
             words = clean_sent.split()
             # Filter bullet fragments, tiny fragments, or TOC lines
-            if len(words) < 5 or _TOC_LINE_REGEX.search(clean_sent):
+            if (
+                len(words) < 5
+                or clean_sent[-1] not in ".!?"
+                or _TOC_LINE_REGEX.search(clean_sent)
+                or OCR_PLACEHOLDER_REGEX.search(clean_sent)
+            ):
                 continue
 
             candidates.append((clean_sent, page_num, original_idx))
@@ -676,7 +683,11 @@ def summarize_llm_section(
         return [], "Private document cannot be sent to external LLM provider."
 
     # Cache check
-    cache_key = f"summary:{document.id}:{section.section_id}:llm:{PROMPT_VERSION}"
+    section_digest = sha256(section.text.encode("utf-8")).hexdigest()
+    cache_key = (
+        f"summary:{document.id}:{section.section_id}:{section_digest}:"
+        f"llm:{PROMPT_VERSION}"
+    )
     if cache_key in _SUMMARY_CACHE:
         return _SUMMARY_CACHE[cache_key], None
 
@@ -766,6 +777,16 @@ def generate_document_summary(
     if not pages:
         raise ValueError(f"Document {document.id} has no pages to summarize.")
 
+    llm_fallback_reason: str | None = None
+    if engine == "llm" and provider is None:
+        settings = get_settings()
+        if settings.allow_external_llm:
+            from app.services.rag.pipeline import RAGChatPipeline
+
+            provider = RAGChatPipeline(settings=settings).provider
+        else:
+            llm_fallback_reason = "External LLM use is disabled."
+
     sections = extract_sections(pages, page_start=page_start, page_end=page_end)
     if not sections:
         # Fall back to raw text of all requested pages
@@ -813,7 +834,10 @@ def generate_document_summary(
         if active_engine == "llm":
             if provider is None:
                 sec_engine_used = "extractive"
-                fallback_reasons.append("No LLM provider available.")
+                fallback_reasons.append(
+                    llm_fallback_reason or "No LLM provider available."
+                )
+                sec_items = summarize_extractive(sec.pages, target_sentences=3)
             else:
                 try:
                     items, err = summarize_llm_section(sec, document, provider)
@@ -838,6 +862,8 @@ def generate_document_summary(
                             ]
                         else:
                             sec_engine_used = "extractive"
+                            if t5_msg:
+                                fallback_reasons.append(t5_msg)
                             sec_items = summarize_extractive(
                                 sec.pages, target_sentences=3
                             )
@@ -905,24 +931,38 @@ def generate_document_summary(
     if summary_type == "short":
         # Map-Reduce: collect all candidate sentences across sections,
         # then select top 3-5 sentences total using extractive centrality
-        all_section_sentences: list[tuple[int, str]] = []
+        all_section_items: list[dict[str, Any]] = []
         for sec_res in section_results:
             for item in sec_res["items"]:
-                p = item["page_start"]
-                all_section_sentences.append((p, item["text"]))
+                all_section_items.append(item)
 
         # Reduce step: select 3-5 sentences
-        reduced = summarize_extractive(all_section_sentences, target_sentences=4)
-        if not reduced and all_section_sentences:
+        reduced = summarize_extractive(
+            [(item["page_start"], item["text"]) for item in all_section_items],
+            target_sentences=4,
+        )
+        for item in reduced:
+            source_item = next(
+                source
+                for source in all_section_items
+                if source["page_start"] == item["page_start"]
+                and source["text"] == item["text"]
+            )
+            item.update(
+                page_end=source_item.get("page_end", item["page_start"]),
+                engine=source_item["engine"],
+                evidence_sentence=source_item.get("evidence_sentence"),
+            )
+        if not reduced and all_section_items:
             reduced = [
                 {
-                    "text": t,
-                    "page_start": p,
-                    "page_end": p,
-                    "engine": overall_engine_used,
-                    "evidence_sentence": None,
+                    "text": item["text"],
+                    "page_start": item["page_start"],
+                    "page_end": item.get("page_end", item["page_start"]),
+                    "engine": item["engine"],
+                    "evidence_sentence": item.get("evidence_sentence"),
                 }
-                for p, t in all_section_sentences[:4]
+                for item in all_section_items[:4]
             ]
         final_items = reduced
 
@@ -972,7 +1012,7 @@ def generate_document_summary(
 
     content_markdown = "\n".join(markdown_lines).strip()
     fallback_reason_text = (
-        " | ".join(set(fallback_reasons)) if fallback_reasons else None
+        " | ".join(dict.fromkeys(fallback_reasons)) if fallback_reasons else None
     )
 
     summary_record = DocumentSummary(
@@ -990,6 +1030,8 @@ def generate_document_summary(
             "sections_count": len(sections),
             "generated_at": datetime.now(UTC).isoformat(),
             "fallback_reasons": fallback_reasons,
+            "requested_page_start": page_start,
+            "requested_page_end": page_end,
         },
     )
     db.add(summary_record)
@@ -1013,6 +1055,7 @@ def start_summary_job(
         "progress": 20,
         "summary_id": None,
         "error": None,
+        "owner_id": owner_id,
     }
     try:
         document = db.scalar(
@@ -1027,6 +1070,7 @@ def start_summary_job(
                 "progress": 100,
                 "summary_id": None,
                 "error": "Document not found or ownership mismatch.",
+                "owner_id": owner_id,
             }
             return
 
@@ -1045,6 +1089,7 @@ def start_summary_job(
             "progress": 100,
             "summary_id": summary.id,
             "error": None,
+            "owner_id": owner_id,
         }
     except Exception as exc:
         db.rollback()
@@ -1054,9 +1099,13 @@ def start_summary_job(
             "progress": 100,
             "summary_id": None,
             "error": str(exc),
+            "owner_id": owner_id,
         }
 
 
-def get_summary_job_status(job_id: str) -> dict[str, Any] | None:
-    """Retrieve runtime status of an asynchronous summary job."""
-    return _SUMMARY_JOBS.get(job_id)
+def get_summary_job_status(job_id: str, owner_id: int) -> dict[str, Any] | None:
+    """Retrieve a summary job's public status for its owning user."""
+    status = _SUMMARY_JOBS.get(job_id)
+    if status is None or status["owner_id"] != owner_id:
+        return None
+    return {key: value for key, value in status.items() if key != "owner_id"}

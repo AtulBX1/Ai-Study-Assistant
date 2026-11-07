@@ -25,9 +25,9 @@ def isolate_test_rate_limit(client: TestClient):
         middleware = getattr(middleware, "app", None)
     assert isinstance(middleware, RateLimitMiddleware)
     assert isinstance(middleware.cache, MemoryCache)
-    middleware.cache._counters.clear()
+    middleware.cache.clear()
     yield
-    middleware.cache._counters.clear()
+    middleware.cache.clear()
 
 
 def _user(db: Session, email: str) -> User:

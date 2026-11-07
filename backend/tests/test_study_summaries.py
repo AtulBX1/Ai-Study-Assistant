@@ -17,6 +17,8 @@ from app.services.study.summaries import (
     extract_sections,
     generate_document_summary,
     is_content_chunk,
+    split_sentences,
+    summarize_extractive,
 )
 from tests.conftest import access_token_for
 
@@ -149,7 +151,7 @@ def test_extractive_summary_verbatim_and_source_order(client, db_session):
 
     all_source_text = f"{s1} {s2} {s3} {s4} {s5}"
     items = data["items"]
-    assert len(items) >= 2
+    assert 3 <= len(items) <= 5
 
     # Check that every sentence appears verbatim in the source text
     last_position = -1
@@ -160,6 +162,26 @@ def test_extractive_summary_verbatim_and_source_order(client, db_session):
         pos = all_source_text.find(sentence)
         assert pos > last_position
         last_position = pos
+
+
+def test_extractive_summary_keeps_lowercase_prose_and_skips_fragments():
+    sentence = "tokenization separates a stream of text into meaningful language units."
+    items = summarize_extractive(
+        [(21, f"- Tokenization\nbroken <num> .\n{sentence}")],
+        target_sentences=3,
+    )
+    assert [item["text"] for item in items] == [sentence]
+    assert items[0]["page_start"] == items[0]["page_end"] == 21
+
+
+def test_sentence_splitter_preserves_initials_in_source_sentences():
+    sentences = split_sentences(
+        'The question is "who wrote Harry Potter?" '
+        'A language model can answer "J.K. Rowling." '
+        "It can also cite the source."
+    )
+    assert len(sentences) == 3
+    assert '"J.K. Rowling."' in sentences[1]
 
 
 # ACCEPTANCE TEST 2
@@ -234,6 +256,39 @@ def test_llm_bullet_grounding_rejects_hallucinations(db_session):
     assert items[0]["engine"] == "llm"
 
 
+def test_llm_engine_uses_the_configured_provider_chain(db_session, monkeypatch):
+    owner = _user(db_session, "provider-chain-user")
+    doc = _document(db_session, owner)
+    evidence = "Language models estimate token probabilities from context."
+    db_session.add(DocumentPage(document_id=doc.id, page_number=1, text=evidence))
+    db_session.commit()
+    provider = FakeSummaryLLMProvider(
+        response_text=(
+            f"- Point: Models estimate token probabilities. | Evidence: {evidence}"
+        )
+    )
+
+    class FakePipeline:
+        def __init__(self, *, settings):
+            self.provider = provider
+
+    monkeypatch.setattr(
+        "app.services.rag.pipeline.RAGChatPipeline",
+        FakePipeline,
+    )
+    summary = generate_document_summary(
+        db_session,
+        document=doc,
+        summary_type="short",
+        engine="llm",
+    )
+
+    assert provider.call_count == 1
+    assert summary.engine_used == "llm"
+    assert summary.items[0]["engine"] == "llm"
+    assert summary.items[0]["page_start"] == 1
+
+
 # ACCEPTANCE TEST 4
 def test_rate_limited_provider_returns_partial_plus_fallback_without_loop(db_session):
     """4. A rate-limited provider returns partial result plus fallback."""
@@ -286,6 +341,55 @@ def test_rate_limited_provider_returns_partial_plus_fallback_without_loop(db_ses
         sec1_items[0]["text"]
         == "Language models assign probabilities to token sequences."
     )
+
+
+def test_detailed_and_chapter_summaries_keep_section_page_ranges(db_session):
+    owner = _user(db_session, "section-summary-user")
+    doc = _document(db_session, owner)
+    first = "Statistical language models estimate token probabilities from context."
+    second = "Word embeddings represent semantic relationships in continuous spaces."
+    db_session.add_all(
+        [
+            DocumentPage(
+                document_id=doc.id,
+                page_number=3,
+                text=first,
+                headings=[{"text": "Language Models"}],
+            ),
+            DocumentPage(
+                document_id=doc.id,
+                page_number=7,
+                text=second,
+                headings=[{"text": "Word Embeddings"}],
+            ),
+        ]
+    )
+    db_session.commit()
+
+    detailed = generate_document_summary(
+        db_session,
+        document=doc,
+        summary_type="detailed",
+        engine="extractive",
+    )
+    chapter_wise = generate_document_summary(
+        db_session,
+        document=doc,
+        summary_type="chapter_wise",
+        engine="extractive",
+    )
+
+    assert [item["page_start"] for item in detailed.items] == [3, 7]
+    assert [item["page_end"] for item in detailed.items] == [3, 7]
+    assert {item["engine"] for item in detailed.items} == {"extractive"}
+    assert [item["title"] for item in chapter_wise.items] == [
+        "Language Models",
+        "Word Embeddings",
+    ]
+    assert [(item["page_start"], item["page_end"]) for item in chapter_wise.items] == [
+        (3, 3),
+        (7, 7),
+    ]
 
 
 # ACCEPTANCE TEST 5
@@ -370,12 +474,127 @@ def test_sections_headings_and_10_page_blocks_and_skip_outline(db_session):
     )
     assert is_content_chunk(toc_text) is False
 
+    outline_with_short_prose = (
+        "- Tokenization\n"
+        "- Stemming\n"
+        "Tokenization separates text into meaningful units for later processing."
+    )
+    assert is_content_chunk(outline_with_short_prose) is False
+
     prose_text = (
         "Natural language processing allows automated systems to understand text. "
         "Statistical methods rely on modeling lexical distributions. "
         "Neural models extend this capability through high-dimensional vectors."
     )
     assert is_content_chunk(prose_text) is True
+
+
+def test_summary_records_are_regenerable_listable_deletable_and_owner_scoped(
+    client, db_session
+):
+    owner = _user(db_session, "summary-owner")
+    other = _user(db_session, "summary-other")
+    doc = _document(db_session, owner)
+    text = (
+        "Statistical language models estimate token probabilities from context. "
+        "Word embeddings represent semantic relationships in continuous spaces. "
+        "Recurrent networks process sequences through hidden state updates. "
+        "Attention mechanisms connect relevant positions across long sequences."
+    )
+    db_session.add(DocumentPage(document_id=doc.id, page_number=4, text=text))
+    db_session.commit()
+
+    path = f"/study/documents/{doc.id}/summaries"
+    created = client.post(
+        path,
+        headers=_headers(owner),
+        json={"summary_type": "short", "engine": "extractive"},
+    )
+    assert created.status_code == 201
+    summary_id = created.json()["id"]
+
+    cached = client.post(
+        path,
+        headers=_headers(owner),
+        json={"summary_type": "short", "engine": "extractive"},
+    )
+    regenerated = client.post(
+        path,
+        headers=_headers(owner),
+        json={
+            "summary_type": "short",
+            "engine": "extractive",
+            "regenerate": True,
+        },
+    )
+    assert cached.json()["id"] == summary_id
+    assert regenerated.json()["id"] != summary_id
+
+    listed = client.get(path, headers=_headers(owner))
+    assert [item["id"] for item in listed.json()] == [
+        regenerated.json()["id"],
+        summary_id,
+    ]
+    assert client.get(path, headers=_headers(other)).status_code == 404
+    assert (
+        client.get(
+            f"/study/summaries/{summary_id}", headers=_headers(other)
+        ).status_code
+        == 404
+    )
+    assert (
+        client.delete(
+            f"/study/summaries/{summary_id}", headers=_headers(other)
+        ).status_code
+        == 404
+    )
+    assert (
+        client.delete(
+            f"/study/summaries/{summary_id}", headers=_headers(owner)
+        ).status_code
+        == 204
+    )
+
+
+def test_async_summary_job_status_is_authenticated_and_owner_scoped(client, db_session):
+    owner = _user(db_session, "async-summary-owner")
+    other = _user(db_session, "async-summary-other")
+    doc = _document(db_session, owner)
+    db_session.add(
+        DocumentPage(
+            document_id=doc.id,
+            page_number=1,
+            text=(
+                "Statistical language models estimate token probabilities from "
+                "context. Word embeddings represent semantic relationships in "
+                "continuous vector spaces."
+            ),
+        )
+    )
+    db_session.commit()
+
+    response = client.post(
+        f"/study/documents/{doc.id}/summaries",
+        headers=_headers(owner),
+        json={"summary_type": "short", "engine": "extractive", "run_async": True},
+    )
+    assert response.status_code == 201
+    job_id = response.json()["job_id"]
+
+    status = client.get(
+        f"/study/summaries/jobs/{job_id}",
+        headers=_headers(owner),
+    )
+    assert status.status_code == 200
+    assert status.json()["status"] == "completed"
+    assert status.json()["summary_id"] is not None
+    assert (
+        client.get(
+            f"/study/summaries/jobs/{job_id}",
+            headers=_headers(other),
+        ).status_code
+        == 404
+    )
 
 
 # ACCEPTANCE TEST 7
@@ -426,6 +645,7 @@ def test_notes_and_cheat_sheet_grounding_and_ownership_isolation(client, db_sess
     assert "[p. 1]" in notes_md
     assert "### Examples" in notes_md
     assert "For example, transformers apply self-attention" in notes_md
+    assert "A mechanism relating different sequence positions." not in notes_md
 
     # 2. Check Cheat Sheet format and grounding
     cheat_response = client.get(
@@ -437,6 +657,10 @@ def test_notes_and_cheat_sheet_grounding_and_ownership_isolation(client, db_sess
     assert "# Cheat Sheet: Deep Learning NLP" in cheat_md
     assert "## Key Terms & Definitions" in cheat_md
     assert "**Self-Attention**:" in cheat_md
+    assert "A mechanism relating different sequence positions." not in cheat_md
+    assert (
+        "For example, transformers apply self-attention to process tokens." in cheat_md
+    )
     assert "## Formulas & Code" in cheat_md
     assert "L = -sum(y * log(p))" in cheat_md
     assert "## Key Facts" in cheat_md

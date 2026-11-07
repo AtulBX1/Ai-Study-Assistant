@@ -586,12 +586,23 @@ def create_summary(
                 DocumentSummary.owner_id == user.id,
                 DocumentSummary.summary_type == request.summary_type,
                 DocumentSummary.engine_requested == request.engine,
-                DocumentSummary.page_start == request.page_start,
-                DocumentSummary.page_end == request.page_end,
             )
             .order_by(DocumentSummary.id.desc())
         )
-        existing = db.scalar(query)
+        existing = next(
+            (
+                summary
+                for summary in db.scalars(query)
+                if isinstance(summary.generation_metadata, dict)
+                and "requested_page_start" in summary.generation_metadata
+                and "requested_page_end" in summary.generation_metadata
+                and summary.generation_metadata["requested_page_start"]
+                == request.page_start
+                and summary.generation_metadata["requested_page_end"]
+                == request.page_end
+            ),
+            None,
+        )
         if existing:
             return _summary_payload(existing)
 
@@ -687,7 +698,7 @@ def get_summary_job(
     user: AuthenticatedUser,
 ) -> dict[str, Any]:
     """Retrieve async summary job status."""
-    status_info = get_summary_job_status(job_id)
+    status_info = get_summary_job_status(job_id, user.id)
     if not status_info:
         raise HTTPException(status_code=404, detail="Summary job not found.")
     return {"job_id": job_id, **status_info}

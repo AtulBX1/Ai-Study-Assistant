@@ -6,7 +6,7 @@ A multi-engine summarization and study-synthesis pipeline for learning materials
 1. **Extractive Engine**: Selects highly salient sentences via TF-IDF centrality and positional weighting, filters near-duplicates, and preserves exact source sentence order. Requires no machine learning weights or external network calls.
 2. **T5 Engine**: Uses fine-tuned local seq2seq transformer weights (T5-small) with 512-token chunks, tri-gram blocking (`no_repeat_ngram_size=3`), repetition suppression, and strict pre-import weight validation that falls back to extractive summarization if weights are absent.
 3. **LLM Engine**: Provider chain integration with token budgeting (< 1,500 input tokens per section), private document isolation, cached completions, and mandatory bullet evidence validation that rejects ungrounded statements. Under rate limits, it returns partial completions with automatic local fallback.
-4. **Map-Reduce Architecture**: Long documents are segmented into chapter headings or ~10-page blocks; each section is summarized in parallel (Map), and the outputs are synthesized into a coherent short summary (Reduce).
+4. **Map-Reduce Architecture**: Long documents are segmented into chapter headings or ~10-page blocks; each section is summarized independently (Map), and the outputs are synthesized into a coherent short summary (Reduce).
 5. **Rule-Based Notes & Cheat Sheets**: Generates Markdown chapter notes (section headers, glossary definitions, main extractive points, in-text examples) and single-page cheat sheets (top terms, mathematical formulas/code lines, key facts) with explicit page references and zero external LLM dependencies.
 
 ## Why
@@ -31,14 +31,14 @@ Documents are partitioned by structure:
 When a request asks for an engine, the orchestrator attempts the requested engine, automatically falling back in the chain: `LLM -> T5 -> Extractive`:
 - **Extractive**: Tokenizes sentences, computes sentence TF-IDF salience normalized by length, rewards introductory and concluding positions, prunes near-duplicates (Jaccard token overlap > 0.55), and sorts selected sentences by original document order.
 - **T5**: Verifies that `models/transformers/t5-summarization/config.json` exists on disk *before* importing PyTorch or Hugging Face libraries. If weights are missing, it falls back to extractive summarization with an explicit reason logged in `fallback_reason`.
-- **LLM**: Dispatches prompts with strict formatting instructions (`- Point: ... | Evidence: ...`). It normalizes whitespace and verifies that every proposed evidence sentence exists verbatim in the section text. Any ungrounded bullet is rejected. If a 429 rate limit is encountered, completed sections are preserved and remaining sections fall back immediately to local extractive synthesis without looping. Private documents (`document.is_private = True`) are blocked from external APIs and routed locally.
+- **LLM**: Uses the Step 11 provider chain and dispatches one prompt per section with strict formatting instructions (`- Point: ... | Evidence: ...`). It normalizes whitespace and verifies that every proposed evidence sentence exists in the section text. Any ungrounded bullet is rejected. If a 429 rate limit is encountered, completed sections are preserved and remaining sections fall back immediately to local extractive synthesis without looping. Private documents (`document.is_private = True`) are blocked from external APIs and routed locally.
 
 ### Map-Reduce for Short Summaries
 - **Map**: Summarizes individual sections/chapters into representative statements.
 - **Reduce**: Aggregates intermediate section statements and ranks them with sentence centrality to extract the top 3–5 most informative sentences spanning the whole document range.
 
 ### Rule-Based Notes & Cheat Sheets
-- **Chapter Notes**: Collects section headers, retrieves saved glossary definitions from Step 13a-1, extracts top main points, isolates sentences matching example indicators (`for example`, `e.g.`, `such as`), and affixes page citations `[p. X]`.
+- **Chapter Notes**: Collects section headers, retrieves saved glossary definitions from Step 13a-1 only when grounded in the cited page, extracts top main points, isolates sentences matching example indicators (`for example`, `e.g.`, `such as`), and affixes page citations `[p. X]`.
 - **Cheat Sheet**: Formats a single-page markdown document containing top terms with 1-line definitions, math formulas or code syntax identified via regex patterns, and key factual sentences.
 
 ## Syllabus concept
@@ -60,4 +60,3 @@ When a request asks for an engine, the orchestrator attempts the requested engin
    *Answer*: Heavy ML frameworks introduce substantial import overhead, memory allocations, and potential crashes if CUDA/dependencies are misconfigured. Verifying file existence first allows instantaneous, clean fallback to the lightweight extractive engine.
 5. **How does the pipeline handle external rate limits (HTTP 429)?**
    *Answer*: Rather than hanging in an infinite retry loop, it preserves the partial summaries already generated by the LLM, logs the rate limit in `fallback_reason`, and completes the remaining sections using the local extractive engine.
-

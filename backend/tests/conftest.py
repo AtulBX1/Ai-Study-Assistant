@@ -14,10 +14,32 @@ from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
-import app.models  # noqa: F401
+from app.core.cache import MemoryCache
 from app.core.config import Settings, get_settings
+
+Settings.model_config["env_file"] = None
+for name in tuple(os.environ):
+    if re.search(
+        r"(?:API_KEY|ACCESS_KEY|SECRET|TOKEN|(?:^|_)PROVIDER(?:_|$)|"
+        r"ALLOW_EXTERNAL_LLM)",
+        name,
+        re.IGNORECASE,
+    ):
+        os.environ.pop(name, None)
+os.environ.update(
+    {
+        "BACKEND": "local",
+        "DATABASE_URL": "sqlite://",
+        "JWT_SECRET_KEY": "test-only-jwt-secret-never-use-in-production",
+        "RATE_LIMIT_IP_PER_MINUTE": "10000",
+        "RATE_LIMIT_USER_PER_MINUTE": "10000",
+    }
+)
+get_settings.cache_clear()
+
+import app.models  # noqa: E402, F401
 from app.core.database import Base, get_db
-from app.main import app
+from app.main import app, rate_limit_cache
 
 
 @pytest.fixture(autouse=True)
@@ -46,6 +68,15 @@ def isolate_provider_environment(
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()
+
+
+@pytest.fixture(autouse=True)
+def clear_shared_rate_limit_cache() -> Generator[None, None, None]:
+    """Keep process-wide middleware counters isolated across tests."""
+    assert isinstance(rate_limit_cache, MemoryCache)
+    rate_limit_cache.clear()
+    yield
+    rate_limit_cache.clear()
 
 
 @pytest.fixture(autouse=True)

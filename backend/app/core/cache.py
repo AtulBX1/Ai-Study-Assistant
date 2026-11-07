@@ -12,6 +12,9 @@ from app.core.config import Settings, get_settings
 class Cache(Protocol):
     """Shared counter and string-value cache used by throttling and embeddings."""
 
+    def clear(self) -> None:
+        """Clear cache entries owned by this application."""
+
     def increment(self, key: str, window_seconds: int) -> int:
         """Increment a counter that expires after the given window."""
 
@@ -29,6 +32,11 @@ class MemoryCache:
         self._lock = Lock()
         self._counters: dict[str, tuple[int, float]] = {}
         self._values: dict[str, tuple[str, float | None]] = {}
+
+    def clear(self) -> None:
+        with self._lock:
+            self._counters.clear()
+            self._values.clear()
 
     def increment(self, key: str, window_seconds: int) -> int:
         deadline = monotonic() + window_seconds
@@ -64,6 +72,15 @@ class RedisCache:
 
     def __init__(self, redis_url: str) -> None:
         self._client: Redis = Redis.from_url(redis_url, decode_responses=True)
+
+    def clear(self) -> None:
+        keys = [
+            key
+            for pattern in ("rate:*", "embedding:*")
+            for key in self._client.scan_iter(match=pattern)
+        ]
+        if keys:
+            self._client.delete(*keys)
 
     def increment(self, key: str, window_seconds: int) -> int:
         script = """

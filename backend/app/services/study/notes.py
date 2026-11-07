@@ -10,8 +10,10 @@ from sqlalchemy.orm import Session
 from app.models import Document, DocumentKeyTerm, DocumentPage, GlossaryTerm
 from app.services.study.glossary import find_evidence_sentence
 from app.services.study.summaries import (
+    OCR_PLACEHOLDER_REGEX,
     DocumentSection,
     extract_sections,
+    normalize_whitespace,
     split_sentences,
     summarize_extractive,
 )
@@ -23,7 +25,7 @@ _EXAMPLE_REGEX = re.compile(
 
 _MATH_OR_CODE_REGEX = re.compile(
     r"(\b(?:def\s+\w+|import\s+\w+|return\b|class\s+\w+|lambda\b)\b|"
-    r"[=><]\s*[\d\w\(\)\+\-\*\/\^]|"
+    r"\b[A-Za-z]\w*\s*(?:<=|>=|=|<|>)\s*[-+]?(?:\d|\w+\s*\()|"
     r"\\(?:frac|sum|int|sigma|alpha|theta|times|cdot)|"
     r"\b(?:argmax|argmin|softmax|loss|perplexity)\b|"
     r"[A-Z]\s*=\s*[\w\d])",
@@ -35,6 +37,18 @@ _FACT_INDICATORS = re.compile(
     r"key\s+property|crucial|primary|fundamental|introduced\s+in)\b",
     re.IGNORECASE,
 )
+
+
+def _grounded_definition(term: str, definition: str, page_text: str) -> str | None:
+    """Return a glossary definition only when it is supported by its source page."""
+    evidence = find_evidence_sentence(page_text, term)
+    if evidence is None:
+        return None
+    normalized_definition = normalize_whitespace(definition).casefold()
+    normalized_page = normalize_whitespace(page_text).casefold()
+    if normalized_definition and normalized_definition in normalized_page:
+        return definition.strip()
+    return evidence
 
 
 def generate_chapter_notes(
@@ -135,7 +149,10 @@ def generate_chapter_notes(
                     break
         else:
             for t in sec_terms[:5]:
-                lines.append(f"- **{t.term}**: {t.definition.strip()} [p. {t.page}]")
+                p_text = next((text for page, text in sec.pages if page == t.page), "")
+                definition = _grounded_definition(t.term, t.definition, p_text)
+                if definition:
+                    lines.append(f"- **{t.term}**: {definition} [p. {t.page}]")
 
         lines.append("\n### Main Points\n")
 
@@ -147,11 +164,19 @@ def generate_chapter_notes(
         # 3. Examples found in the text
         lines.append("\n### Examples\n")
         example_sentences: list[tuple[int, str]] = []
+        seen_examples: set[str] = set()
         for p_num, p_text in sec.pages:
             sents = split_sentences(p_text)
             for s in sents:
                 s_strip = s.strip()
-                if _EXAMPLE_REGEX.search(s_strip) and len(s_strip.split()) >= 6:
+                normalized_example = normalize_whitespace(s_strip).casefold()
+                if (
+                    _EXAMPLE_REGEX.search(s_strip)
+                    and len(s_strip.split()) >= 6
+                    and not OCR_PLACEHOLDER_REGEX.search(s_strip)
+                    and normalized_example not in seen_examples
+                ):
+                    seen_examples.add(normalized_example)
                     example_sentences.append((p_num, s_strip))
                 if len(example_sentences) >= 3:
                     break
@@ -221,8 +246,19 @@ def generate_cheat_sheet(
         norm = gt.term.lower().strip()
         if norm not in seen_terms:
             seen_terms.add(norm)
+            p_text = next(
+                (
+                    page.cleaned_text or page.text or ""
+                    for page in filtered_pages
+                    if page.page_number == gt.page
+                ),
+                "",
+            )
+            definition = _grounded_definition(gt.term, gt.definition, p_text)
+            if definition is None:
+                continue
             # Ensure one-line definition
-            first_sent = gt.definition.strip().splitlines()[0]
+            first_sent = definition.splitlines()[0]
             if len(first_sent) > 160:
                 first_sent = first_sent[:157] + "..."
             term_lines.append(f"- **{gt.term}**: {first_sent} [p. {gt.page}]")
@@ -274,11 +310,19 @@ def generate_cheat_sheet(
             if not rline_clean or len(rline_clean) < 4:
                 continue
 
-            if _MATH_OR_CODE_REGEX.search(rline_clean):
-                norm_f = rline_clean.lower()
-                if norm_f not in seen_formulas:
-                    seen_formulas.add(norm_f)
-                    formula_lines.append(f"{rline_clean}  # [p. {p.page_number}]")
+            candidates = (
+                split_sentences(rline_clean)
+                if len(rline_clean.split()) > 20
+                else [rline_clean]
+            )
+            for candidate in candidates:
+                if _MATH_OR_CODE_REGEX.search(candidate):
+                    norm_f = candidate.lower()
+                    if norm_f not in seen_formulas:
+                        seen_formulas.add(norm_f)
+                        formula_lines.append(f"{candidate}  # [p. {p.page_number}]")
+                if len(formula_lines) >= 6:
+                    break
             if len(formula_lines) >= 6:
                 break
         if len(formula_lines) >= 6:
@@ -286,11 +330,19 @@ def generate_cheat_sheet(
 
     # 3. Short list of key facts
     fact_candidates: list[tuple[int, str]] = []
+    seen_facts: set[str] = set()
     for p in filtered_pages:
         sents = split_sentences(p.cleaned_text or p.text or "")
         for s in sents:
             s_clean = s.strip()
-            if _FACT_INDICATORS.search(s_clean) and len(s_clean.split()) >= 6:
+            normalized_fact = normalize_whitespace(s_clean).casefold()
+            if (
+                _FACT_INDICATORS.search(s_clean)
+                and len(s_clean.split()) >= 6
+                and not OCR_PLACEHOLDER_REGEX.search(s_clean)
+                and normalized_fact not in seen_facts
+            ):
+                seen_facts.add(normalized_fact)
                 fact_candidates.append((p.page_number, s_clean))
             if len(fact_candidates) >= 10:
                 break
