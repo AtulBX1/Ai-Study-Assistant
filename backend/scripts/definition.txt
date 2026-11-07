@@ -5,3 +5,6 @@ DEFINITION OF DONE (every step):
     (4) one Alembic head, and `upgrade head` works on an empty database;
      (5) no __pycache__, .pyc or .pytest-tmp files committed;
       (6) stop and report; do not start the next step.
+
+FRONTEND RULES: Next.js (App Router) + TypeScript strict + Tailwind + shadcn/ui. Never read or print .env or .env.local. Frontend tests use mocked network only (no real backend, keys or model calls). Definition of done for frontend work: `.\scripts\check.ps1` must also run npm lint, type-check, unit tests and a production build in /frontend, and print CHECK PASSED. Caches and browser downloads go to D: (npm cache and PLAYWRIGHT_BROWSERS_PATH are set); never commit node_modules, .next or test-results.
+PRODUCT: a self-study app for individual students. Roles are student and admin only. There are no teachers or classes. Public tests show anonymous handles, never email or names.
