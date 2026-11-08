@@ -1,12 +1,14 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { isUnsupportedSentence } from "@/lib/study-utils";
 
 export type Citation = { title: string; page: number };
 
 type Props = {
   content: string;
-  onCitationClick: (page: number) => void;
+  unsupportedSentences?: string[];
+  onCitationClick: (page: number, title: string) => void;
 };
 
 function safeHref(value: string): string | null {
@@ -20,7 +22,7 @@ function safeHref(value: string): string | null {
 
 function inlineContent(
   text: string,
-  onCitationClick: (page: number) => void,
+  onCitationClick: (page: number, title: string) => void,
 ): ReactNode[] {
   const pattern =
     /(\[[^\],]+,\s*p\.?\s*\d+\]|`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*|\[[^\]]+\]\([^)]+\))/gi;
@@ -40,7 +42,7 @@ function inlineContent(
           type="button"
           className="mx-1 inline-flex rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary hover:bg-primary/20"
           aria-label={`Go to ${title}, page ${page}`}
-          onClick={() => onCitationClick(page)}
+          onClick={() => onCitationClick(page, title)}
         >
           {title}, p.{page}
         </button>,
@@ -80,7 +82,11 @@ function inlineContent(
   return output;
 }
 
-export function MarkdownAnswer({ content, onCitationClick }: Props) {
+export function MarkdownAnswer({
+  content,
+  unsupportedSentences = [],
+  onCitationClick,
+}: Props) {
   const blocks: ReactNode[] = [];
   const lines = content.split(/\r?\n/);
   let paragraph: string[] = [];
@@ -95,7 +101,22 @@ export function MarkdownAnswer({ content, onCitationClick }: Props) {
         {paragraph.map((line, index) => (
           <span key={index}>
             {index ? <br /> : null}
-            {inlineContent(line, onCitationClick)}
+            {line.split(/(?<=[.!?])\s+/).map((sentence, sentenceIndex) =>
+              isUnsupportedSentence(sentence.trim(), unsupportedSentences) ? (
+                <span
+                  key={`unsupported-${sentenceIndex}`}
+                  className="underline decoration-wavy decoration-danger underline-offset-2"
+                  title="Not found in your document"
+                  aria-label={`${sentence} Not found in your document`}
+                >
+                  {inlineContent(sentence, onCitationClick)}
+                </span>
+              ) : (
+                <span key={`sentence-${sentenceIndex}`}>
+                  {inlineContent(sentence, onCitationClick)}
+                </span>
+              ),
+            )}
           </span>
         ))}
       </p>,

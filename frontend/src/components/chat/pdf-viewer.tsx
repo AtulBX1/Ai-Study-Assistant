@@ -2,6 +2,7 @@
 
 import {
   forwardRef,
+  memo,
   useCallback,
   useEffect,
   useImperativeHandle,
@@ -12,16 +13,44 @@ import type { KeyboardEvent } from "react";
 import { Minus, Plus, ChevronLeft, ChevronRight, Maximize } from "lucide-react";
 import type { PDFDocumentProxy, PDFPageProxy } from "pdfjs-dist";
 import { Button } from "@/components/ui/button";
+import { findPassageInTextLayer } from "@/lib/citation-matching";
 import { downloadDocument, getDocumentPageImage } from "@/lib/documents";
+
+export type SourceHighlight = {
+  id: number;
+  page: number;
+  text: string;
+};
 
 export type PdfViewerHandle = {
   scrollToPage: (page: number) => void;
+  scrollToSource: (page: number, text: string) => void;
+  clearHighlight: () => void;
 };
 
 type PdfViewerProps = {
   documentId: number;
   pageCount: number | null;
 };
+
+export function SourcePassageBanner({
+  page,
+  text,
+}: {
+  page: number;
+  text: string;
+}) {
+  return (
+    <div
+      role="status"
+      className="border-b border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs"
+    >
+      <p className="font-semibold">Source passage</p>
+      <p className="mt-1 text-muted-foreground">Page {page}</p>
+      <p className="mt-1 whitespace-pre-wrap">{text}</p>
+    </div>
+  );
+}
 
 function PdfPage({
   pdf,
@@ -30,8 +59,10 @@ function PdfPage({
   containerWidth,
   zoom,
   fallback,
+  highlight,
   onVisible,
   onFailure,
+  onHighlightResult,
 }: {
   pdf: PDFDocumentProxy;
   documentId: number;
@@ -39,8 +70,10 @@ function PdfPage({
   containerWidth: number;
   zoom: number;
   fallback: boolean;
+  highlight: SourceHighlight | null;
   onVisible: (page: number) => void;
   onFailure: (page: number) => void;
+  onHighlightResult: (page: number, matched: boolean) => void;
 }) {
   const frame = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
@@ -49,6 +82,10 @@ function PdfPage({
   const [ratio, setRatio] = useState(0.77);
   const [fallbackUrl, setFallbackUrl] = useState<string | null>(null);
   const [fallbackError, setFallbackError] = useState<string | null>(null);
+  const [textReady, setTextReady] = useState(false);
+  const [highlightRects, setHighlightRects] = useState<
+    Array<{ left: number; top: number; width: number; height: number }>
+  >([]);
 
   useEffect(() => {
     const node = frame.current;
@@ -92,6 +129,8 @@ function PdfPage({
     let canceled = false;
     let renderTask: ReturnType<PDFPageProxy["render"]> | undefined;
     let textTask: { cancel: () => void; render: () => Promise<unknown> } | undefined;
+    setTextReady(false);
+    setHighlightRects([]);
     void (async () => {
       try {
         const page = await pdf.getPage(pageNumber);
@@ -127,6 +166,7 @@ function PdfPage({
           viewport,
         });
         await textTask.render();
+        if (!canceled) setTextReady(true);
       } catch {
         if (!canceled) onFailure(pageNumber);
       }
@@ -137,6 +177,41 @@ function PdfPage({
       textTask?.cancel();
     };
   }, [containerWidth, fallback, intersected, onFailure, pageNumber, pdf, zoom]);
+
+  useEffect(() => {
+    if (!highlight || highlight.page !== pageNumber) {
+      setHighlightRects([]);
+      return;
+    }
+    if (fallback) {
+      setHighlightRects([]);
+      onHighlightResult(pageNumber, false);
+      return;
+    }
+    if (!textReady) return;
+    const textTarget = textLayer.current;
+    const frameTarget = frame.current;
+    if (!textTarget || !frameTarget) return;
+    const match = findPassageInTextLayer(textTarget, highlight.text);
+    if (!match) {
+      setHighlightRects([]);
+      onHighlightResult(pageNumber, false);
+      return;
+    }
+    const frameBounds = frameTarget.getBoundingClientRect();
+    const rects = Array.from(match.range.getClientRects()).map((rect) => ({
+      left: rect.left - frameBounds.left,
+      top: rect.top - frameBounds.top,
+      width: rect.width,
+      height: rect.height,
+    }));
+    setHighlightRects(rects);
+    match.range.startContainer.parentElement?.scrollIntoView({
+      behavior: "smooth",
+      block: "center",
+    });
+    onHighlightResult(pageNumber, true);
+  }, [fallback, highlight, onHighlightResult, pageNumber, textReady]);
 
   return (
     <div
@@ -166,16 +241,26 @@ function PdfPage({
             className="textLayer absolute inset-0 select-text"
             aria-label={`Selectable text on page ${pageNumber}`}
           />
+          <div className="pointer-events-none absolute inset-0" aria-hidden="true">
+            {highlightRects.map((rect, index) => (
+              <span
+                key={`${index}-${highlight?.id ?? 0}`}
+                className="absolute rounded-sm bg-yellow-300/70 outline outline-1 outline-yellow-500/60"
+                style={rect}
+              />
+            ))}
+          </div>
         </>
       )}
     </div>
   );
 }
 
-export const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(
+export const PdfViewer = memo(forwardRef<PdfViewerHandle, PdfViewerProps>(
   function PdfViewer({ documentId, pageCount }, ref) {
     const scrollContainer = useRef<HTMLDivElement>(null);
     const pageNodes = useRef(new Map<number, HTMLDivElement>());
+    const pendingPageScroll = useRef<number | null>(null);
     const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);
     const [totalPages, setTotalPages] = useState(pageCount ?? 1);
     const [currentPage, setCurrentPage] = useState(1);
@@ -185,6 +270,9 @@ export const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(
     const [error, setError] = useState<string | null>(null);
     const [fallbackAll, setFallbackAll] = useState(false);
     const [failedPages, setFailedPages] = useState<Set<number>>(() => new Set());
+    const [highlight, setHighlight] = useState<SourceHighlight | null>(null);
+    const [sourceBanner, setSourceBanner] = useState<SourceHighlight | null>(null);
+    const highlightSequence = useRef(0);
 
     useImperativeHandle(
       ref,
@@ -192,14 +280,49 @@ export const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(
         scrollToPage(page) {
           const target = Math.min(Math.max(1, Math.floor(page)), totalPages);
           setCurrentPage(target);
-          pageNodes.current.get(target)?.scrollIntoView({
-            behavior: "smooth",
-            block: "start",
-          });
+          const targetNode = pageNodes.current.get(target);
+          if (targetNode) {
+            pendingPageScroll.current = null;
+            targetNode.scrollIntoView({ behavior: "smooth", block: "start" });
+          } else {
+            pendingPageScroll.current = target;
+          }
+        },
+        scrollToSource(page, text) {
+          const target = Math.min(Math.max(1, Math.floor(page)), totalPages);
+          if (highlight?.page === target && highlight.text === text) {
+            setHighlight(null);
+            setSourceBanner(null);
+            return;
+          }
+          const next = { id: ++highlightSequence.current, page: target, text };
+          setHighlight(next);
+          setSourceBanner(null);
+          setCurrentPage(target);
+          const targetNode = pageNodes.current.get(target);
+          if (targetNode) {
+            pendingPageScroll.current = null;
+            targetNode.scrollIntoView({ behavior: "smooth", block: "start" });
+          } else {
+            pendingPageScroll.current = target;
+          }
+        },
+        clearHighlight() {
+          setHighlight(null);
+          setSourceBanner(null);
         },
       }),
-      [totalPages],
+      [highlight, totalPages],
     );
+
+    useEffect(() => {
+      const target = pendingPageScroll.current;
+      if (!pdf || target === null) return;
+      const targetNode = pageNodes.current.get(target);
+      if (!targetNode) return;
+      pendingPageScroll.current = null;
+      targetNode.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, [pdf]);
 
     useEffect(() => {
       const element = scrollContainer.current;
@@ -241,7 +364,6 @@ export const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(
           }
           setPdf(loaded);
           setTotalPages(loaded.numPages);
-          setCurrentPage(1);
         } catch (caught) {
           if (!canceled) {
             setFallbackAll(true);
@@ -267,6 +389,13 @@ export const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(
     const onFailure = useCallback((page: number) => {
       setFailedPages((pages) => new Set(pages).add(page));
     }, []);
+    const onHighlightResult = useCallback(
+      (page: number, matched: boolean) => {
+        if (matched || !highlight || highlight.page !== page) return;
+        setSourceBanner(highlight);
+      },
+      [highlight],
+    );
     const changePage = (page: number) => {
       const target = Math.min(totalPages, Math.max(1, page));
       setCurrentPage(target);
@@ -290,6 +419,12 @@ export const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(
       <section
         aria-label="PDF viewer"
         className="flex h-full min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-card"
+        onClick={(event) => {
+          if (!(event.target instanceof HTMLElement && event.target.closest("[data-keep-pdf-highlight]"))) {
+            setHighlight(null);
+            setSourceBanner(null);
+          }
+        }}
       >
         <div className="flex flex-wrap items-center justify-center gap-2 border-b border-border p-2">
           <Button
@@ -369,6 +504,9 @@ export const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(
             PDF preview unavailable; trying the page image service. {error}
           </p>
         ) : null}
+        {sourceBanner ? (
+          <SourcePassageBanner page={sourceBanner.page} text={sourceBanner.text} />
+        ) : null}
         <div
           ref={scrollContainer}
           tabIndex={0}
@@ -393,8 +531,10 @@ export const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(
                   containerWidth={containerWidth}
                   zoom={zoom}
                   fallback={failedPages.has(page)}
+                  highlight={highlight}
                   onVisible={onVisible}
                   onFailure={onFailure}
+                  onHighlightResult={onHighlightResult}
                 />
               </div>
             ))
@@ -409,7 +549,7 @@ export const PdfViewer = forwardRef<PdfViewerHandle, PdfViewerProps>(
       </section>
     );
   },
-);
+));
 
 function FallbackPage({
   documentId,
