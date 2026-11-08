@@ -1,10 +1,5 @@
-import { ComingSoonPage } from "@/components/app/coming-soon-page";
+import { FlashcardDecksPage } from "@/components/study/flashcard-pages";
 
 export default function FlashcardsPage() {
-  return (
-    <ComingSoonPage
-      title="Flashcards"
-      description="Review important concepts with active recall."
-    />
-  );
+  return <FlashcardDecksPage />;
 }

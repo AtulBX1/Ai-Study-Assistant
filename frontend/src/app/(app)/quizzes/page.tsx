@@ -1,10 +1,5 @@
-import { ComingSoonPage } from "@/components/app/coming-soon-page";
+import { QuizListPage } from "@/components/study/quiz-pages";
 
 export default function QuizzesPage() {
-  return (
-    <ComingSoonPage
-      title="Quizzes"
-      description="Practice what you know with focused, course-aligned quizzes."
-    />
-  );
+  return <QuizListPage />;
 }
