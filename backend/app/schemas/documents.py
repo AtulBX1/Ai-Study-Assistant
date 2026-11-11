@@ -15,6 +15,7 @@ class DocumentResponse(BaseModel):
     error_message: str | None
     page_count: int | None
     language: str | None
+    is_private: bool
     created_at: datetime
 
 

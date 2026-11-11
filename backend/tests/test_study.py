@@ -109,7 +109,7 @@ def test_due_cards_include_past_and_today_but_not_future_or_suspended(
     assert {item["front"] for item in response.json()} == {"Card past", "Card today"}
 
 
-def test_generation_is_idempotent_and_uses_accepted_questions_and_glossary(
+def test_generation_is_idempotent_and_uses_glossary_not_quiz_questions(
     client, db_session
 ):
     owner = _user(db_session, "generation-owner")
@@ -195,10 +195,136 @@ def test_generation_is_idempotent_and_uses_accepted_questions_and_glossary(
     second_response = client.post(path, headers=headers)
 
     assert first_response.status_code == 201
-    assert first_response.json()["created"] == 3
+    assert first_response.json()["created"] == 2
+    assert first_response.json()["created_by_source"] == {
+        "glossary": 1,
+        "cloze": 1,
+        "ai": 0,
+        "wrong_answer": 0,
+    }
     assert second_response.status_code == 201
     assert second_response.json()["created"] == 0
-    assert db_session.query(Flashcard).filter_by(document_id=document.id).count() == 3
+    assert db_session.query(Flashcard).filter_by(document_id=document.id).count() == 2
+    assert {
+        card.source_type
+        for card in db_session.query(Flashcard).filter_by(document_id=document.id)
+    } == {"glossary", "cloze"}
+
+
+def test_document_flashcards_generate_without_any_quiz_and_are_deduplicated(
+    client, db_session
+):
+    owner = _user(db_session, "document-cards-owner")
+    document = _document(db_session, owner)
+    evidence = "Attention is a mechanism that lets a model focus on relevant tokens."
+    db_session.add_all(
+        [
+            DocumentPage(
+                document_id=document.id,
+                page_number=1,
+                text=evidence,
+            ),
+            DocumentKeyTerm(
+                document_id=document.id,
+                term="Attention",
+                label="KEYPHRASE",
+                page=1,
+                source="keyphrase",
+            ),
+        ]
+    )
+    db_session.commit()
+
+    path = f"/study/documents/{document.id}/flashcards/generate"
+    first = client.post(path, headers=_headers(owner), params={"count": 10})
+    second = client.post(path, headers=_headers(owner), params={"count": 10})
+
+    assert first.status_code == 201, first.text
+    assert first.json()["created"] == 2
+    assert first.json()["created_by_source"] == {
+        "glossary": 1,
+        "cloze": 1,
+        "ai": 0,
+        "wrong_answer": 0,
+    }
+    assert all(card["evidence_sentence"] == evidence for card in first.json()["cards"])
+    assert {card["source_type"] for card in first.json()["cards"]} == {
+        "glossary",
+        "cloze",
+    }
+    assert second.status_code == 201
+    assert second.json()["created"] == 0
+    assert db_session.query(Quiz).filter_by(source_document_id=document.id).count() == 0
+
+
+def test_ai_flashcards_are_batched_and_require_page_evidence(
+    client, db_session, monkeypatch
+):
+    owner = _user(db_session, "ai-cards-owner")
+    document = _document(db_session, owner)
+    evidence = (
+        "Self-attention is a mechanism that lets a model focus on relevant tokens."
+    )
+    db_session.add_all(
+        [
+            DocumentPage(
+                document_id=document.id,
+                page_number=1,
+                text=evidence,
+            ),
+            DocumentKeyTerm(
+                document_id=document.id,
+                term="Self-attention",
+                label="KEYPHRASE",
+                page=1,
+                source="keyphrase",
+            ),
+            Chunk(
+                doc_id=document.id,
+                page=1,
+                page_start=1,
+                page_end=1,
+                text=evidence,
+                token_count=12,
+                chunk_index=0,
+            ),
+        ]
+    )
+    db_session.commit()
+
+    class FakeProvider:
+        def __init__(self):
+            self.calls = 0
+
+        def generate(self, _prompt, system_prompt=None):
+            self.calls += 1
+            return (
+                '[{"question":"What mechanism lets a model focus on relevant tokens?",'
+                '"answer":"Self-attention","evidence":'
+                f'"{evidence}"}}]'
+            )
+
+    provider = FakeProvider()
+    monkeypatch.setattr("app.routers.quizzes._provider", lambda: provider)
+    response = client.post(
+        f"/study/documents/{document.id}/flashcards/generate",
+        headers=_headers(owner),
+        params={"count": 3},
+    )
+
+    assert response.status_code == 201, response.text
+    assert response.json()["created_by_source"] == {
+        "glossary": 1,
+        "cloze": 1,
+        "ai": 1,
+        "wrong_answer": 0,
+    }
+    assert provider.calls == 1
+    ai_card = next(
+        card for card in response.json()["cards"] if card["source_type"] == "ai"
+    )
+    assert ai_card["evidence_sentence"] == evidence
+    assert ai_card["source_page"] == 1
 
 
 def test_regenerated_glossary_definitions_are_exact_page_sentences(client, db_session):

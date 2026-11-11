@@ -283,6 +283,7 @@ def _card_payload(card: Flashcard, deck: str | None = None) -> dict[str, Any]:
         "id": card.id,
         "front": card.front,
         "back": card.back,
+        "source_type": card.source_type,
         "source_page": card.source_page,
         "evidence_sentence": card.evidence_sentence,
         "deck": deck,
@@ -339,19 +340,52 @@ def generate_flashcards(
     document_id: int,
     db: DatabaseSession,
     user: AuthenticatedUser,
+    count: Annotated[int, Query(ge=1, le=40)] = 40,
+    page_start: Annotated[int | None, Query(ge=1)] = None,
+    page_end: Annotated[int | None, Query(ge=1)] = None,
+    chapter: Annotated[str | None, Query(min_length=1, max_length=255)] = None,
+    also_add_wrong_answers: bool = False,
 ) -> dict[str, Any]:
-    """Create missing cards from accepted questions and the stored glossary."""
+    """Create page-scoped document flashcards, optionally adding wrong answers."""
     document = _owned_document(db, document_id, user.id)
-    created = generate_document_flashcards(
+    try:
+        page_start, page_end = _resolve_graph_scope(
+            db,
+            document_id=document.id,
+            chapter=chapter,
+            page_start=page_start,
+            page_end=page_end,
+        )
+    except HTTPException:
+        raise
+    if page_start is not None and page_end is not None and page_end < page_start:
+        raise HTTPException(
+            status_code=422, detail="page_end must be at least page_start."
+        )
+    provider = None
+    if not document.is_private:
+        from app.routers.quizzes import _provider
+
+        try:
+            provider = _provider()
+        except ProviderUnavailableError:
+            provider = None
+    created, report = generate_document_flashcards(
         db,
         document=document,
         owner_id=user.id,
+        count=count,
+        page_start=page_start,
+        page_end=page_end,
+        also_add_wrong_answers=also_add_wrong_answers,
+        provider=provider,
     )
     db.commit()
     return {
         "document_id": document.id,
         "deck": document.title,
         "created": len(created),
+        **report,
         "cards": [_card_payload(card, document.title) for card in created],
     }
 

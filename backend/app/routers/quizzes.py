@@ -2,6 +2,7 @@
 
 from collections import Counter, defaultdict
 from datetime import UTC, datetime
+from types import SimpleNamespace
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
@@ -16,6 +17,7 @@ from app.models import (
     Chunk,
     Document,
     DocumentKeyTerm,
+    DocumentPage,
     Question,
     Quiz,
     QuizAttempt,
@@ -92,9 +94,9 @@ def _provider() -> Any:
     configured = []
     for name in settings.llm_provider_chain.split(","):
         name = name.strip().lower()
-        if name == "gemini":
+        if name == "gemini" and settings.gemini_api_key:
             configured.append(GeminiProvider())
-        elif name == "groq":
+        elif name == "groq" and settings.groq_api_key:
             configured.append(GroqProvider())
         elif name == "ollama":
             configured.append(OllamaProvider())
@@ -142,6 +144,49 @@ def _question_payload(
     return payload
 
 
+def _type_quotas(request: GenerationRequest) -> dict[str, int]:
+    """Split the requested count in question-type round-robin order."""
+    selected = [item.value for item in request.question_types]
+    return {
+        kind: request.count // len(selected)
+        + int(index < request.count % len(selected))
+        for index, kind in enumerate(selected)
+    }
+
+
+def _type_cycle(quotas: dict[str, int]) -> tuple[str, ...]:
+    """Expand remaining per-type quotas into the requested generation order."""
+    remaining = quotas.copy()
+    cycle: list[str] = []
+    while any(remaining.values()):
+        for kind in quotas:
+            if remaining[kind] > 0:
+                cycle.append(kind)
+                remaining[kind] -= 1
+    return tuple(cycle)
+
+
+def _top_rejections(rejects: Counter[str]) -> dict[str, int]:
+    return dict(rejects.most_common(5))
+
+
+def _type_report(
+    requested: dict[str, int],
+    produced: Counter[str] | None = None,
+    rejects: dict[str, Counter[str]] | None = None,
+) -> dict[str, dict[str, Any]]:
+    produced = produced or Counter()
+    rejects = rejects or {}
+    return {
+        kind: {
+            "requested": count,
+            "produced": produced[kind],
+            "reject_reasons": _top_rejections(rejects.get(kind, Counter())),
+        }
+        for kind, count in requested.items()
+    }
+
+
 @router.post("", status_code=201)
 def create_quiz(
     request: GenerationRequest, db: DatabaseSession, user: AuthenticatedUser
@@ -180,33 +225,246 @@ def create_quiz(
         raise HTTPException(
             status_code=422, detail="No source chunks match the quiz selection."
         )
+    requested_by_type = _type_quotas(request)
     private_selected = any(doc_by_id[chunk.doc_id].is_private for chunk in chunks)
-    engine_name = request.engine
-    fallback_reason = None
-    llm = None
-    if engine_name == "llm":
-        if private_selected:
-            fallback_reason = "private_document"
-        else:
-            try:
-                llm = LLMEngine(_provider())
-            except ProviderUnavailableError:
-                fallback_reason = "provider_unavailable"
-        if fallback_reason:
-            engine_name = "classic"
-    classic = ClassicEngine()
+    if request.chapter:
+        pages = list(
+            db.scalars(
+                select(DocumentPage)
+                .where(DocumentPage.document_id.in_(doc_by_id))
+                .order_by(DocumentPage.document_id, DocumentPage.page_number)
+            )
+        )
+        ranges: dict[int, tuple[int, int]] = {}
+        for document_id in doc_by_id:
+            doc_pages = [page for page in pages if page.document_id == document_id]
+            headings = [
+                (page.page_number, str(heading["text"]).strip())
+                for page in doc_pages
+                for heading in page.headings or []
+                if isinstance(heading, dict)
+                and isinstance(heading.get("text"), str)
+                and heading["text"].strip()
+            ]
+            for index, (start, title) in enumerate(headings):
+                if title.casefold() != request.chapter.strip().casefold():
+                    continue
+                next_page = next(
+                    (
+                        page_number
+                        for page_number, _ in headings[index + 1 :]
+                        if page_number > start
+                    ),
+                    None,
+                )
+                end = (
+                    next_page - 1
+                    if next_page is not None
+                    else max((page.page_number for page in doc_pages), default=start)
+                )
+                ranges[document_id] = (start, end)
+                break
+        if not ranges:
+            raise HTTPException(status_code=404, detail="Chapter not found.")
+        chunks = [
+            chunk
+            for chunk in chunks
+            if chunk.doc_id in ranges
+            and chunk.page_end >= ranges[chunk.doc_id][0]
+            and chunk.page_start <= ranges[chunk.doc_id][1]
+        ]
+        if not chunks:
+            raise HTTPException(
+                status_code=422, detail="No source chunks match the chapter scope."
+            )
+        private_selected = any(doc_by_id[chunk.doc_id].is_private for chunk in chunks)
+
+    if request.engine == "ai" and private_selected:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "message": "AI quiz generation is not allowed for private documents.",
+                "top_reject_reasons": {"private_document": 1},
+                "by_type": _type_report(
+                    requested_by_type,
+                    rejects={
+                        kind: Counter({"private_document": 1})
+                        for kind in requested_by_type
+                    },
+                ),
+            },
+        )
+    ai_engine: LLMEngine | None = None
+    fallback_reason: str | None = (
+        "private_document" if private_selected and request.engine != "offline" else None
+    )
+    if request.engine != "offline" and not private_selected:
+        try:
+            ai_engine = LLMEngine(_provider())
+        except ProviderUnavailableError as error:
+            if request.engine == "ai":
+                raise HTTPException(
+                    status_code=503,
+                    detail={
+                        "message": (
+                            "AI quiz generation is unavailable: no provider is ready."
+                        ),
+                        "top_reject_reasons": {"provider_unavailable": 1},
+                        "by_type": _type_report(
+                            requested_by_type,
+                            rejects={
+                                kind: Counter({"provider_unavailable": 1})
+                                for kind in requested_by_type
+                            },
+                        ),
+                    },
+                ) from error
+            fallback_reason = "provider_unavailable"
+    if request.engine == "ai" and ai_engine is None:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "message": "AI quiz generation is unavailable.",
+                "top_reject_reasons": {"provider_unavailable": 1},
+                "by_type": _type_report(requested_by_type),
+            },
+        )
+
+    offline = ClassicEngine()
+    remaining = requested_by_type.copy()
     accepted: list[QuizQuestion] = []
     rejects: Counter[str] = Counter()
+    rejects_by_type: dict[str, Counter[str]] = {
+        kind: Counter() for kind in requested_by_type
+    }
     attempted = 0
-    # Load per-document term candidates without disclosing source text to a provider.
     terms_by_doc: dict[int, list[str]] = defaultdict(list)
     for term in db.scalars(
         select(DocumentKeyTerm).where(DocumentKeyTerm.document_id.in_(doc_by_id))
     ):
         terms_by_doc[term.document_id].append(term.term)
+    generated_engines: set[str] = set()
+
+    def reject(reason: str, kind: str, count: int = 1) -> None:
+        rejects[reason] += count
+        if kind in rejects_by_type:
+            rejects_by_type[kind][reason] += count
+
+    def generate_for_chunk(
+        engine: Any,
+        chunk: Chunk,
+        *,
+        engine_label: str,
+    ) -> None:
+        nonlocal attempted, ai_engine, fallback_reason
+        topic = chunk.section or (request.topics[0] if request.topics else "General")
+        chunk.key_terms = terms_by_doc[chunk.doc_id]
+        source_text = clean_chunk_text(chunk.text)
+        generation_chunk = SimpleNamespace(
+            id=chunk.id,
+            page=chunk.page,
+            text=source_text,
+            key_terms=chunk.key_terms,
+            difficulty_label=chunk.difficulty_label,
+        )
+        cycle = _type_cycle(remaining)
+        if not cycle:
+            return
+        try:
+            generated = engine.generate(
+                generation_chunk,
+                topic=topic,
+                difficulty=request.difficulty.value if request.difficulty else None,
+                question_quota=min(3, sum(remaining.values()))
+                if engine_label == "offline"
+                else sum(remaining.values()),
+                type_cycle=cycle,
+            )
+            if engine_label == "ai":
+                provider = getattr(engine, "provider", None)
+                provider_name = (
+                    getattr(provider, "last_provider", "")
+                    or getattr(provider, "name", "")
+                )
+                for item in generated:
+                    item.provider = item.provider or provider_name or None
+        except (
+            StructuredOutputError,
+            RateLimitError,
+            ProviderError,
+            ProviderUnavailableError,
+            ValueError,
+            OSError,
+        ) as error:
+            reason = (
+                "ai_rate_limited"
+                if isinstance(error, RateLimitError)
+                else "ai_generation_failed"
+            )
+            rejects[reason] += 1
+            for kind, quota in remaining.items():
+                if quota:
+                    rejects_by_type[kind][reason] += 1
+            if request.engine == "ai":
+                status = 429 if isinstance(error, RateLimitError) else 502
+                raise HTTPException(
+                    status_code=status,
+                    detail={
+                        "message": (
+                            "AI quiz generation failed; no offline fallback was "
+                            "requested."
+                        ),
+                        "top_reject_reasons": _top_rejections(rejects),
+                        "by_type": _type_report(
+                            requested_by_type,
+                            Counter(item.type.value for item in accepted),
+                            rejects_by_type,
+                        ),
+                    },
+                ) from error
+            fallback_reason = reason
+            ai_engine = None
+            return
+        if engine_label == "offline":
+            for reason, count in getattr(engine, "last_rejections", {}).items():
+                rejects[reason] += count
+                for kind, quota in remaining.items():
+                    if quota:
+                        rejects_by_type[kind][reason] += count
+        for candidate in generated:
+            attempted += 1
+            kind = candidate.type.value
+            if kind not in remaining:
+                reject("unrequested_question_type", kind)
+                continue
+            if remaining[kind] <= 0:
+                reject("type_quota_exceeded", kind)
+                continue
+            if request.difficulty and candidate.difficulty != request.difficulty:
+                reject("difficulty_mismatch", kind)
+                continue
+            candidate.engine = engine_label
+            try:
+                ok, reason = validate_generated(
+                    candidate,
+                    source_text,
+                    qa_model=offline.qa_model,
+                    round_trip_threshold=get_settings().quiz_round_trip_f1_threshold,
+                    prior_questions=[item.question for item in accepted],
+                    similarity=embedding_similarity,
+                    key_terms=terms_by_doc[chunk.doc_id],
+                )
+            except OSError:
+                reject("qa_model_unavailable", kind)
+                continue
+            if not ok:
+                reject(reason, kind)
+                continue
+            accepted.append(candidate)
+            remaining[kind] -= 1
+            generated_engines.add(engine_label)
+
     for chunk in chunks:
-        if len(accepted) >= request.question_count:
-            break
         if request.topics and not any(
             topic.casefold() in (chunk.section or "").casefold()
             or any(
@@ -216,110 +474,66 @@ def create_quiz(
             for topic in request.topics
         ):
             continue
-        chunk.key_terms = terms_by_doc[chunk.doc_id]
-        topic = chunk.section or (request.topics[0] if request.topics else "General")
-        active = llm if engine_name == "llm" and fallback_reason is None else classic
-        try:
-            generated = active.generate(
-                chunk,
-                topic=topic,
-                difficulty=request.difficulty.value if request.difficulty else None,
-            )
-            if active is llm and isinstance(llm.provider, ProviderChain):
-                for item in generated:
-                    item.provider = llm.provider.last_provider or "unknown"
-        except StructuredOutputError as error:
-            rejects["llm_parse_failure"] += error.parse_failures
-            fallback_reason, llm, engine_name = (
-                "invalid_structured_output",
-                None,
-                "classic",
-            )
-            active = classic
-            generated = classic.generate(
-                chunk,
-                topic=topic,
-                difficulty=request.difficulty.value if request.difficulty else None,
-            )
-        except RateLimitError:
-            rejects["llm_parse_failure"] += getattr(llm, "last_parse_failures", 0)
-            fallback_reason, llm = "rate_limited", None
-            engine_name = "classic"
-            active = classic
-            generated = classic.generate(
-                chunk,
-                topic=topic,
-                difficulty=request.difficulty.value if request.difficulty else None,
-            )
-        except (ProviderError, ProviderUnavailableError, ValueError, OSError):
-            if engine_name == "llm":
-                rejects["llm_parse_failure"] += getattr(llm, "last_parse_failures", 0)
-                fallback_reason, llm, engine_name = "provider_error", None, "classic"
-                active = classic
-                generated = classic.generate(
-                    chunk,
-                    topic=topic,
-                    difficulty=request.difficulty.value if request.difficulty else None,
-                )
-            else:
-                rejects["generation_error"] += 1
-                continue
-        if active is classic:
-            rejects.update(getattr(classic, "last_rejections", {}))
-        for candidate in generated:
-            attempted += 1
-            candidate.engine = engine_name
-            if request.difficulty and candidate.difficulty != request.difficulty:
-                rejects["difficulty_mismatch"] += 1
-                continue
-            try:
-                ok, reason = validate_generated(
-                    candidate,
-                    clean_chunk_text(chunk.text) if active is classic else chunk.text,
-                    qa_model=classic.qa_model,
-                    round_trip_threshold=get_settings().quiz_round_trip_f1_threshold,
-                    prior_questions=[item.question for item in accepted],
-                    similarity=embedding_similarity,
-                )
-            except OSError:
-                rejects["qa_model_unavailable"] += 1
-                continue
-            if not ok:
-                rejects[reason] += 1
-                continue
-            accepted.append(candidate)
-            if len(accepted) >= request.question_count:
+        if ai_engine is not None and request.engine != "offline":
+            generate_for_chunk(ai_engine, chunk, engine_label="ai")
+        if not any(remaining.values()):
+            break
+
+    if request.engine in {"offline", "auto"} and any(remaining.values()):
+        if ai_engine is not None and request.engine == "auto":
+            fallback_reason = fallback_reason or "offline_top_up"
+        for chunk in chunks:
+            if not any(remaining.values()):
                 break
-    if not accepted:
-        raise HTTPException(
-            status_code=422,
-            detail={"message": "No questions passed validation.", "rejects": rejects},
-        )
+            if request.topics and not any(
+                topic.casefold() in (chunk.section or "").casefold()
+                or any(
+                    topic.casefold() in term.casefold()
+                    for term in terms_by_doc[chunk.doc_id]
+                )
+                for topic in request.topics
+            ):
+                continue
+            generate_for_chunk(offline, chunk, engine_label="offline")
+
     before_balance = len(accepted)
     accepted = balance_true_false_questions(accepted)
-    if len(accepted) < before_balance:
-        rejects["quiz_true_false_balance"] += before_balance - len(accepted)
+    balance_rejected = before_balance - len(accepted)
+    if balance_rejected:
+        rejects["quiz_true_false_balance"] += balance_rejected
+        rejects_by_type["true_false"]["quiz_true_false_balance"] += balance_rejected
+    produced_by_type = Counter(item.type.value for item in accepted)
+    for kind, requested in requested_by_type.items():
+        missing = requested - produced_by_type[kind]
+        if missing:
+            rejects["insufficient_valid_questions"] += missing
+            rejects_by_type[kind]["insufficient_valid_questions"] += missing
+    report_by_type = _type_report(requested_by_type, produced_by_type, rejects_by_type)
+    report = {
+        "accepted": len(accepted),
+        "rejected": _top_rejections(rejects),
+        "top_reject_reasons": _top_rejections(rejects),
+        "attempted": attempted,
+        "requested_engine": request.engine,
+        "engines_used": sorted(generated_engines),
+        "fallback_reason": fallback_reason,
+        "difficulty_mix": dict(Counter(q.difficulty.value for q in accepted)),
+        "by_type": report_by_type,
+    }
     if not accepted:
         raise HTTPException(
             status_code=422,
             detail={
-                "message": "No balanced true/false questions passed validation.",
-                "rejects": rejects,
+                "message": "No questions passed validation.",
+                "top_reject_reasons": _top_rejections(rejects),
+                "by_type": report_by_type,
             },
         )
-    report = {
-        "accepted": len(accepted),
-        "rejected": dict(rejects),
-        "attempted": attempted,
-        "requested_engine": request.engine,
-        "fallback_reason": fallback_reason,
-        "difficulty_mix": dict(Counter(q.difficulty.value for q in accepted)),
-    }
     quiz = Quiz(
         owner_id=user.id,
         title=request.title,
         source_document_id=documents[0].id,
-        engine=engine_name,
+        engine=request.engine,
         generation_report=report,
     )
     db.add(quiz)

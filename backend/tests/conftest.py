@@ -31,6 +31,7 @@ os.environ.update(
         "BACKEND": "local",
         "DATABASE_URL": "sqlite://",
         "JWT_SECRET_KEY": "test-only-jwt-secret-never-use-in-production",
+        "SKIP_MODEL_WARMUP": "true",
         "RATE_LIMIT_IP_PER_MINUTE": "10000",
         "RATE_LIMIT_USER_PER_MINUTE": "10000",
     }

@@ -1,6 +1,7 @@
 """Grounding, similarity, and structural checks for generated questions."""
 
 import re
+import unicodedata
 from collections import Counter
 from collections.abc import Callable, Iterable
 
@@ -71,6 +72,7 @@ VERB_HINTS = {
     "become",
     "can",
     "contain",
+    "compile",
     "create",
     "develop",
     "does",
@@ -102,6 +104,29 @@ VERB_HINTS = {
     "study",
     "support",
 }
+ANSWER_FUNCTION_WORDS = {
+    "a",
+    "an",
+    "and",
+    "as",
+    "at",
+    "because",
+    "but",
+    "by",
+    "for",
+    "from",
+    "in",
+    "into",
+    "of",
+    "on",
+    "or",
+    "so",
+    "the",
+    "this",
+    "to",
+    "with",
+}
+SYMBOL_CLUTTER = re.compile(r"[•●▪◦➜→➔⇒◆◇■□⚠💡]")
 
 
 def _is_verb_token(token: str) -> bool:
@@ -298,6 +323,31 @@ def answer_in_source(answer: str, source: str) -> bool:
     return " ".join(answer.casefold().split()) in " ".join(source.casefold().split())
 
 
+def has_symbols_or_clutter(value: str) -> bool:
+    """Reject emoji, mathematical symbols, arrows, bullets, and box glyphs."""
+    filtered = re.sub(
+        r"(?<!\w)(?:C\+\+|C#|F#)(?!\w)",
+        "",
+        value,
+        flags=re.IGNORECASE,
+    )
+    return bool(SYMBOL_CLUTTER.search(value)) or any(
+        unicodedata.category(character).startswith("S")
+        or character in {"\u200d", "\ufe0f"}
+        for character in filtered
+    )
+
+
+def is_short_noun_phrase(value: str) -> bool:
+    """Accept short terms, noun phrases, and numeric answers."""
+    words = TOKEN.findall(value)
+    if not 1 <= len(words) <= 5 or words[0].casefold() in ANSWER_FUNCTION_WORDS:
+        return False
+    if re.fullmatch(r"[\d,.%+-]+", value.strip()):
+        return True
+    return not any(word.casefold() in VERB_HINTS for word in words)
+
+
 def distractor_is_valid(
     candidate: str,
     answer: str,
@@ -365,6 +415,14 @@ def validate_generated(
         return False, "evidence_not_in_source"
     if normalize(question.explanation) != evidence:
         return False, "explanation_not_evidence"
+    if has_symbols_or_clutter(question.question) or has_symbols_or_clutter(
+        question.correct_answer
+    ):
+        return False, "symbol_clutter"
+    if question.type.value != "true_false" and not is_short_noun_phrase(
+        question.correct_answer
+    ):
+        return False, "answer_not_noun_phrase"
     stem_valid, stem_reason, _ = validate_stem(question.question)
     if (
         not stem_valid
@@ -438,18 +496,22 @@ def validate_generated(
         if not re.match(r"^True or false:\s+.+[.!?]$", question.question, re.I):
             return False, "unreadable_true_false"
         claim = question.question.split(":", 1)[1].strip()
-        if question.engine == "llm":
+        if question.engine in {"llm", "ai"}:
             try:
                 from app.nlp.preprocessing import _spacy_model
 
-                doc = _spacy_model()(claim)
-                if not any(
-                    token.dep_ in {"nsubj", "nsubjpass", "csubj"} for token in doc
-                ):
-                    return False, "true_false_missing_subject"
-                if not any(token.pos_ in {"VERB", "AUX"} for token in doc):
-                    return False, "true_false_missing_verb"
-            except (ImportError, OSError, RuntimeError):
+                nlp = _spacy_model()
+                if nlp is not None and nlp.has_pipe("parser"):
+                    doc = nlp(claim)
+                    if not any(
+                        token.dep_ in {"nsubj", "nsubjpass", "csubj"} for token in doc
+                    ):
+                        return False, "true_false_missing_subject"
+                    if not any(token.pos_ in {"VERB", "AUX"} for token in doc):
+                        return False, "true_false_missing_verb"
+                elif readability_score(claim) < 1:
+                    return False, "unreadable_true_false"
+            except (ImportError, OSError, RuntimeError, TypeError):
                 return False, "true_false_spacy_unavailable"
         elif readability_score(claim) < 1:
             return False, "unreadable_true_false"

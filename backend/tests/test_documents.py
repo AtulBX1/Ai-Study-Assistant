@@ -483,3 +483,36 @@ def test_document_list_supports_owner_scoped_pagination(
     assert response.status_code == 200
     assert len(response.json()) == 1
     assert response.json()[0]["id"] == first["id"] + 1
+
+
+def test_document_responses_expose_privacy_in_list_and_detail(
+    document_context: DocumentTestContext,
+    db_session,
+) -> None:
+    document = Document(
+        owner_id=document_context.owner.id,
+        title="Private study notes",
+        status="ready",
+        is_private=True,
+    )
+    db_session.add(document)
+    db_session.commit()
+
+    listed = document_context.client.get("/documents", headers=document_context.headers)
+    detail = document_context.client.get(
+        f"/documents/{document.id}",
+        headers=document_context.headers,
+    )
+
+    assert listed.status_code == 200
+    assert next(item for item in listed.json() if item["id"] == document.id)[
+        "is_private"
+    ]
+    assert detail.status_code == 200
+    assert detail.json()["is_private"] is True
+    assert (
+        document_context.client.get("/openapi.json").json()["components"]["schemas"][
+            "DocumentResponse"
+        ]["properties"]["is_private"]["type"]
+        == "boolean"
+    )

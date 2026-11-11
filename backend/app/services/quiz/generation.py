@@ -4,6 +4,7 @@ import inspect
 import json
 import re
 import time
+import unicodedata
 from collections import Counter
 from collections.abc import Callable, Sequence
 from typing import Any
@@ -409,7 +410,7 @@ def extract_candidates(
 
 
 def clean_chunk_text(text: str) -> str:
-    """Remove common slide, bullet, and table artifacts before quiz generation."""
+    """Remove symbol clutter and common slide, bullet, and table artifacts."""
     cleaned_lines = []
     for raw_line in text.splitlines():
         if "|" in raw_line or re.search(r"\bConcept\s+Example\b", raw_line, re.I):
@@ -419,12 +420,23 @@ def clean_chunk_text(text: str) -> str:
         if re.search(r"\[\s*table\s*\d*\s*\]", raw_line, re.I):
             continue
         line = re.sub(r"\[\s*table\s*\d*\s*\]", " ", raw_line, flags=re.I)
+        line = re.sub(r"(?<!\w)C\+\+(?!\w)", "CPPLANGUAGE", line, flags=re.I)
+        line = re.sub(r"(?<!\w)(C|F)#(?!\w)", r"\1SHARPLANGUAGE", line, flags=re.I)
+        line = "".join(
+            " "
+            if unicodedata.category(character).startswith("S")
+            or character in {"\u200d", "\ufe0f"}
+            else character
+            for character in line
+        )
         line = re.sub(r"[•●▪◦➜→➔⇒◆◇■□]+", " ", line)
         line = re.sub(r"^\s*(?:[-*]+|\d+[.)])\s*", "", line)
         line = re.sub(r"^\s*step\s*\d+\s*[:.)-]?\s*", "", line, flags=re.I)
         line = re.sub(
             r"\b(?:slide|page|lecture|chapter)\s*#?\s*\d+\b", " ", line, flags=re.I
         )
+        line = re.sub(r"\bCPPLANGUAGE\b", "C++", line, flags=re.I)
+        line = re.sub(r"\b(C|F)SHARPLANGUAGE\b", r"\1#", line, flags=re.I)
         line = line.replace(";", ". ")
         line = re.sub(r"\s+", " ", line).strip(" \t|;:")
         if (
@@ -487,7 +499,7 @@ def _contains_verb(text: str) -> bool:
         pass
     return bool(
         re.search(
-            r"\b(?:am|are|be|been|being|can|could|did|does|do|had|has|have|is|may|might|must|shall|should|was|were|will|would|adds?|applies|called|contains?|converts?|creates?|describes?|develops?|enables?|explains?|generates?|includes?|involves?|learns?|means?|models?|occur|provides?|represents?|requires?|shows?|studies|supports?|uses?|works?|\w+(?:ed|ing|izes|ises))\b",
+            r"\b(?:am|are|be|been|being|can|could|did|does|do|had|has|have|is|may|might|must|shall|should|was|were|will|would|adds?|applies|called|compiles?|contains?|converts?|creates?|describes?|develops?|enables?|explains?|generates?|includes?|involves?|learns?|means?|models?|occur|provides?|represents?|requires?|shows?|studies|supports?|uses?|works?|\w+(?:ed|ing|izes|ises))\b",
             text,
             re.I,
         )
@@ -594,7 +606,7 @@ def balance_true_false_questions(
         for item in questions
         if item.type.value == "true_false" and item.correct_answer.casefold() == "false"
     ]
-    if not false_items:
+    if not true_items or not false_items:
         return [item for item in questions if item.type.value != "true_false"]
     keep_true, keep_false = len(true_items), len(false_items)
     if keep_true > 7 * keep_false / 3:
@@ -676,7 +688,7 @@ class ClassicEngine:
         generated: list[QuizQuestion] = []
         used_sentences: set[str] = set()
         for offset, kind in enumerate(type_cycle):
-            if len(generated) >= min(2, question_quota or 2):
+            if len(generated) >= min(3, question_quota or 3):
                 break
             if not candidates:
                 break
@@ -712,6 +724,9 @@ class ClassicEngine:
                 continue
             answer, answer_type, sentence = selected
             used_sentences.add(sentence.casefold())
+            requested_kind = kind
+            if kind == "multiple_choice":
+                kind = "fill_in_the_blank"
             if kind == "true_false":
                 self._tf_count = getattr(self, "_tf_count", 0) + 1
                 target, statement = "True", sentence
@@ -781,6 +796,57 @@ class ClassicEngine:
                     continue
                 prompt = f"Fill in the blank: {filled_sentence}"
                 target, options = answer, None
+                if requested_kind == "multiple_choice":
+                    distractors = select_distractors(
+                        answer, candidates, answer_type=answer_type
+                    )
+                    embedder = self.embedder
+                    if len(distractors) < 3 and embedder is None:
+                        try:
+                            from app.services.embeddings import get_embedding_service
+
+                            embedder = get_embedding_service().embed_texts
+                        except (ImportError, OSError, RuntimeError, ValueError):
+                            embedder = None
+                    if len(distractors) < 3 and embedder is not None:
+                        try:
+                            vectors = embedder(
+                                [answer, *(value for value, _ in candidates)]
+                            )
+                            neighbours = sorted(
+                                (
+                                    (
+                                        value,
+                                        sum(
+                                            left * right
+                                            for left, right in zip(
+                                                vectors[0], vector, strict=True
+                                            )
+                                        ),
+                                        kind_name,
+                                    )
+                                    for (value, kind_name), vector in zip(
+                                        candidates, vectors[1:], strict=True
+                                    )
+                                ),
+                                key=lambda item: item[1],
+                                reverse=True,
+                            )
+                            distractors = select_distractors(
+                                answer,
+                                candidates,
+                                answer_type=answer_type,
+                                neighbours=neighbours,
+                            )
+                        except (OSError, RuntimeError, TypeError, ValueError):
+                            self.last_rejections[
+                                "embedding_neighbours_unavailable"
+                            ] += 1
+                    if len(distractors) < 3:
+                        self.last_rejections["insufficient_distractors"] += 1
+                        continue
+                    kind = "multiple_choice"
+                    options = [answer, *distractors[:3]]
             else:
                 if kind in {"short_answer", "what_question"}:
                     prompt = _question_for_answer(sentence, answer) or ""
@@ -945,6 +1011,7 @@ class LLMEngine:
         type_names = tuple(
             kind.value if hasattr(kind, "value") else str(kind) for kind in type_cycle
         )
+        type_names = tuple(dict.fromkeys(type_names))
         cache_keys = [(chunk_id, kind, LLM_PROMPT_VERSION) for kind in type_names]
         if cache_keys and all(key in _LLM_RESPONSE_CACHE for key in cache_keys):
             cached = [

@@ -24,6 +24,7 @@ from app.routers import (
     study,
     transformers,
 )
+from app.services.model_warmup import start_model_warmup
 from app.services.rag.providers import provider_cooldown_status
 
 settings = get_settings()
@@ -37,6 +38,7 @@ logger = logging.getLogger(__name__)
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     """Log application startup and shutdown."""
     logger.info("Backend application starting")
+    start_model_warmup()
     yield
     logger.info("Backend application stopping")
 

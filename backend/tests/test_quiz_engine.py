@@ -141,6 +141,74 @@ def test_distractor_filters_aliases_substrings_and_wrong_types():
     )
 
 
+def test_cleaning_strips_symbols_and_validation_rejects_bad_answers():
+    cleaned = clean_chunk_text(
+        "⚠️ Python language supports indentation. 💡 "
+        "Arrows →, bullets •, and boxes ■ are clutter."
+    )
+    assert "⚠" not in cleaned
+    assert "💡" not in cleaned
+    assert "→" not in cleaned
+    assert "•" not in cleaned
+    assert "■" not in cleaned
+
+    bad_answer = _question(
+        options=["But The vectors", "Java", "C++", "Ruby"],
+        correct_answer="But The vectors",
+    )
+    assert validate_generated(
+        bad_answer,
+        bad_answer.evidence,
+        qa_model=lambda *_: "But The vectors",
+    ) == (False, "answer_not_noun_phrase")
+    emoji_question = _question(
+        question="Which organization ⚠️ developed the Python language?"
+    )
+    assert validate_generated(
+        emoji_question,
+        emoji_question.evidence,
+        qa_model=lambda *_: "Python Software Foundation",
+    ) == (False, "symbol_clutter")
+
+
+def test_offline_multiple_choice_uses_distinct_same_type_distractors():
+    text = (
+        "Python language supports indentation and readable syntax for code examples. "
+        "Java language compiles source files into portable bytecode for applications. "
+        "Ruby language provides concise syntax for dynamic web application "
+        "development. "
+        "Kotlin language supports interoperable development on the JVM platform."
+    )
+    entities = [
+        {"text": name, "label": "LANG"} for name in ("Python", "Java", "Ruby", "Kotlin")
+    ]
+    engine = ClassicEngine(
+        entity_extractor=lambda _text: entities,
+        embedder=lambda values: [[1.0, 0.0] for _ in values],
+    )
+    chunk = SimpleNamespace(
+        id=72,
+        page=3,
+        text=text,
+        key_terms=[],
+        difficulty_label="easy",
+    )
+
+    questions = engine.generate(
+        chunk,
+        type_cycle=("multiple_choice",),
+        question_quota=1,
+    )
+
+    assert len(questions) == 1
+    question = questions[0]
+    assert question.type.value == "multiple_choice"
+    assert question.options is not None
+    assert len(question.options) == 4
+    assert len({option.casefold() for option in question.options}) == 4
+    assert question.correct_answer in question.options
+
+
 def test_grading_and_retake_selection():
     assert grade_answer("true", "True", question_type="true_false")
     assert not grade_answer("Almost", "True", question_type="true_false")
@@ -345,6 +413,7 @@ def test_quiz_assembly_balances_true_false_without_rejecting_true_candidates():
     true_count = sum(item.correct_answer == "True" for item in balanced)
     assert 30 <= 100 * true_count / len(balanced) <= 70
     assert balance_true_false_questions(true_questions) == []
+    assert balance_true_false_questions(false_questions) == []
 
 
 def test_classic_text_cleaning_and_sentence_filtering():

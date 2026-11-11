@@ -318,6 +318,7 @@ class Flashcard(TimestampMixin, Base):
     )
     front: Mapped[str] = mapped_column(Text)
     back: Mapped[str] = mapped_column(Text)
+    source_type: Mapped[str] = mapped_column(String(32), default="glossary")
     source_page: Mapped[int | None] = mapped_column(Integer)
     evidence_sentence: Mapped[str | None] = mapped_column(Text)
     fact_key: Mapped[str | None] = mapped_column(String(64))

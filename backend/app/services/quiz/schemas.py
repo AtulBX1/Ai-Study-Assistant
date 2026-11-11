@@ -1,8 +1,18 @@
 """Validated quiz payloads shared by generation and API layers."""
 
+import re
+import unicodedata
 from enum import StrEnum
+from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import (
+    AliasChoices,
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_validator,
+    model_validator,
+)
 
 
 class QuestionType(StrEnum):
@@ -16,6 +26,12 @@ class Difficulty(StrEnum):
     EASY = "easy"
     MEDIUM = "medium"
     HARD = "hard"
+
+
+class QuizEngine(StrEnum):
+    AUTO = "auto"
+    OFFLINE = "offline"
+    AI = "ai"
 
 
 class QuizQuestion(BaseModel):
@@ -32,13 +48,30 @@ class QuizQuestion(BaseModel):
     source_chunk_id: int = Field(gt=0)
     page: int = Field(ge=1)
     difficulty: Difficulty
-    engine: str = Field(pattern="^(classic|llm)$")
+    engine: str = Field(pattern="^(classic|llm|offline|ai)$")
     topic: str = Field(default="General", max_length=255)
     provider: str | None = Field(default=None, max_length=64)
     source_page_url: str | None = None
 
     @model_validator(mode="after")
     def validate_options(self) -> "QuizQuestion":
+        if self.options:
+            for option in self.options:
+                if not option.strip():
+                    raise ValueError("Options must not be empty.")
+                filtered = re.sub(
+                    r"(?<!\w)(?:C\+\+|C#|F#)(?!\w)",
+                    "",
+                    option,
+                    flags=re.IGNORECASE,
+                )
+                if any(
+                    unicodedata.category(character).startswith("S")
+                    or character
+                    in {"•", "●", "▪", "◦", "◆", "◇", "■", "□", "\u200d", "\ufe0f"}
+                    for character in filtered
+                ):
+                    raise ValueError("Options must not contain symbols or emoji.")
         if self.type == QuestionType.MULTIPLE_CHOICE:
             if self.options is None or len(self.options) < 4:
                 raise ValueError("Multiple choice requires at least four options.")
@@ -67,14 +100,48 @@ class GenerationRequest(BaseModel):
     document_ids: list[int] = Field(min_length=1, max_length=10)
     page_start: int | None = Field(default=None, ge=1)
     page_end: int | None = Field(default=None, ge=1)
+    chapter: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=255,
+        validation_alias=AliasChoices("chapter", "chapter_scope"),
+    )
     topics: list[str] = Field(default_factory=list, max_length=30)
     chunk_ids: list[int] = Field(default_factory=list, max_length=100)
-    question_count: int = Field(default=10, ge=1, le=50)
-    engine: str = Field(default="classic", pattern="^(classic|llm)$")
+    question_types: list[QuestionType] = Field(
+        default_factory=lambda: [
+            QuestionType.MULTIPLE_CHOICE,
+            QuestionType.TRUE_FALSE,
+            QuestionType.FILL_BLANK,
+            QuestionType.SHORT_ANSWER,
+        ],
+        min_length=1,
+        max_length=4,
+    )
+    count: int = Field(
+        default=10,
+        ge=1,
+        le=50,
+        validation_alias=AliasChoices("count", "question_count"),
+    )
+    engine: QuizEngine = QuizEngine.AUTO
     difficulty: Difficulty | None = None
+
+    @field_validator("engine", mode="before")
+    @classmethod
+    def normalize_legacy_engine(cls, value: Any) -> Any:
+        return (
+            {"classic": "offline", "llm": "ai"}.get(value, value)
+            if isinstance(value, str)
+            else value
+        )
 
     @model_validator(mode="after")
     def valid_range(self) -> "GenerationRequest":
+        if len(set(self.question_types)) != len(self.question_types):
+            raise ValueError("question_types must not contain duplicates.")
         if self.page_start and self.page_end and self.page_end < self.page_start:
             raise ValueError("page_end must be at least page_start.")
+        if self.chapter and (self.page_start or self.page_end):
+            raise ValueError("Use either chapter or page range, not both.")
         return self
