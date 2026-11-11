@@ -415,9 +415,11 @@ def create_quiz(
                     select(ChunkTopic.topic_id)
                     .where(
                         ChunkTopic.chunk_id == chunk.id,
-                        ChunkTopic.topic_id.in_(scoped_topic_names)
-                        if scoped_topic_names
-                        else False,
+                        (
+                            ChunkTopic.topic_id.in_(scoped_topic_names)
+                            if scoped_topic_names
+                            else False
+                        ),
                     )
                     .order_by(ChunkTopic.score.desc())
                 )
@@ -448,9 +450,11 @@ def create_quiz(
                 generation_chunk,
                 topic=topic,
                 difficulty=request.difficulty.value if request.difficulty else None,
-                question_quota=min(3, sum(remaining.values()))
-                if engine_label == "offline"
-                else sum(remaining.values()),
+                question_quota=(
+                    min(3, sum(remaining.values()))
+                    if engine_label == "offline"
+                    else sum(remaining.values())
+                ),
                 type_cycle=cycle,
             )
             if engine_label == "ai":
@@ -633,22 +637,24 @@ def create_quiz(
                 source_chunk_id=item.source_chunk_id,
                 engine=item.engine,
                 topic=item.topic,
-                syllabus_topic_id=next(
-                    (
-                        topic_id
-                        for topic_id, title in scoped_topic_names.items()
-                        if title == item.topic
-                        and db.scalar(
-                            select(ChunkTopic.id).where(
-                                ChunkTopic.chunk_id == item.source_chunk_id,
-                                ChunkTopic.topic_id == topic_id,
+                syllabus_topic_id=(
+                    next(
+                        (
+                            topic_id
+                            for topic_id, title in scoped_topic_names.items()
+                            if title == item.topic
+                            and db.scalar(
+                                select(ChunkTopic.id).where(
+                                    ChunkTopic.chunk_id == item.source_chunk_id,
+                                    ChunkTopic.topic_id == topic_id,
+                                )
                             )
-                        )
-                    ),
-                    None,
-                )
-                if request.syllabus_id is not None
-                else None,
+                        ),
+                        None,
+                    )
+                    if request.syllabus_id is not None
+                    else None
+                ),
                 page=item.page,
             )
         )

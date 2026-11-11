@@ -636,7 +636,7 @@ def test_current_migration_is_the_single_head_and_upgrades_empty_database(
 
     try:
         assert ScriptDirectory.from_config(alembic_config).get_heads() == [
-            "14b_public_tests_and_handles"
+            "15c_syllabus_mapping"
         ]
         command.upgrade(alembic_config, "head")
         engine = create_engine(f"sqlite:///{database_path.as_posix()}")
@@ -648,6 +648,9 @@ def test_current_migration_is_the_single_head_and_upgrades_empty_database(
                 "public_tests",
                 "public_test_attempts",
                 "public_test_reports",
+                "syllabi",
+                "syllabus_topics",
+                "chunk_topics",
             } <= set(inspector.get_table_names())
             assert not {
                 "classes",

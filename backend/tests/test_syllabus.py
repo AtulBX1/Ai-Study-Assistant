@@ -20,12 +20,14 @@ class FakeEmbedder:
 
 
 def test_parse_nested_numbering_bullets_and_comma_subtopics():
-    parsed = parse_syllabus("""Unit I: Mathematics
+    parsed = parse_syllabus(
+        """Unit I: Mathematics
 1. Calculus, limits; derivatives
 1.1 Differential calculus
 - Chain rule
 2. Algebra
-""")
+"""
+    )
     assert parsed[0]["title"] == "Mathematics"
     assert parsed[0]["children"][0]["title"] == "Calculus"
     assert parsed[0]["children"][0]["sub_topics"] == ["limits", "derivatives"]

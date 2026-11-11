@@ -327,9 +327,9 @@ def syllabus_analytics(
                 "topic": topic.title,
                 "answers": len(results),
                 "correct": correct,
-                "accuracy_percent": round(accuracy * 100, 2)
-                if accuracy is not None
-                else None,
+                "accuracy_percent": (
+                    round(accuracy * 100, 2) if accuracy is not None else None
+                ),
                 "weak": len(results) >= 3 and accuracy < 0.7,
             }
         )
@@ -339,9 +339,9 @@ def syllabus_analytics(
         "syllabus_id": item.id,
         "topics": stats,
         "weak_areas": [value for value in stats if value["weak"]],
-        "progress_percent": round(progressing / len(topics) * 100, 2)
-        if topics
-        else 0.0,
+        "progress_percent": (
+            round(progressing / len(topics) * 100, 2) if topics else 0.0
+        ),
         "progress_topics": progressing,
         "total_topics": len(topics),
     }

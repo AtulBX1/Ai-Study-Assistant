@@ -423,10 +423,12 @@ def clean_chunk_text(text: str) -> str:
         line = re.sub(r"(?<!\w)C\+\+(?!\w)", "CPPLANGUAGE", line, flags=re.I)
         line = re.sub(r"(?<!\w)(C|F)#(?!\w)", r"\1SHARPLANGUAGE", line, flags=re.I)
         line = "".join(
-            " "
-            if unicodedata.category(character).startswith("S")
-            or character in {"\u200d", "\ufe0f"}
-            else character
+            (
+                " "
+                if unicodedata.category(character).startswith("S")
+                or character in {"\u200d", "\ufe0f"}
+                else character
+            )
             for character in line
         )
         line = re.sub(r"[•●▪◦➜→➔⇒◆◇■□]+", " ", line)
