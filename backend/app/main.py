@@ -22,6 +22,7 @@ from app.routers import (
     rag_playground,
     search,
     study,
+    syllabus,
     transformers,
 )
 from app.services.model_warmup import start_model_warmup
@@ -73,6 +74,7 @@ app.include_router(chat.router)
 app.include_router(quizzes.router)
 app.include_router(public_tests.router)
 app.include_router(study.router)
+app.include_router(syllabus.router)
 app.include_router(study.export_router)
 app.include_router(transformers.lab_router)
 app.include_router(transformers.documents_router)

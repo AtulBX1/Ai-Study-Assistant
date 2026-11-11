@@ -97,7 +97,9 @@ class GenerationRequest(BaseModel):
     """Bounded quiz-generation request."""
 
     title: str = Field(default="Study quiz", min_length=1, max_length=255)
-    document_ids: list[int] = Field(min_length=1, max_length=10)
+    document_ids: list[int] = Field(default_factory=list, max_length=10)
+    syllabus_id: int | None = Field(default=None, gt=0)
+    topic_ids: list[int] = Field(default_factory=list, max_length=50)
     page_start: int | None = Field(default=None, ge=1)
     page_end: int | None = Field(default=None, ge=1)
     chapter: str | None = Field(
@@ -138,6 +140,10 @@ class GenerationRequest(BaseModel):
 
     @model_validator(mode="after")
     def valid_range(self) -> "GenerationRequest":
+        if not self.document_ids and self.syllabus_id is None:
+            raise ValueError("Provide document_ids or syllabus_id.")
+        if self.topic_ids and self.syllabus_id is None:
+            raise ValueError("topic_ids require syllabus_id.")
         if len(set(self.question_types)) != len(self.question_types):
             raise ValueError("question_types must not contain duplicates.")
         if self.page_start and self.page_end and self.page_end < self.page_start:

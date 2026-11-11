@@ -184,6 +184,55 @@ class Chunk(Base):
     document: Mapped[Document] = relationship(back_populates="chunks")
 
 
+class Syllabus(TimestampMixin, Base):
+    __tablename__ = "syllabi"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    title: Mapped[str] = mapped_column(String(255))
+    topics: Mapped[list["SyllabusTopic"]] = relationship(
+        back_populates="syllabus",
+        cascade="all, delete-orphan",
+        order_by="SyllabusTopic.order",
+    )
+
+
+class SyllabusTopic(Base):
+    __tablename__ = "syllabus_topics"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    syllabus_id: Mapped[int] = mapped_column(
+        ForeignKey("syllabi.id", ondelete="CASCADE"), index=True
+    )
+    parent_id: Mapped[int | None] = mapped_column(
+        ForeignKey("syllabus_topics.id", ondelete="CASCADE"), index=True
+    )
+    title: Mapped[str] = mapped_column(String(255))
+    order: Mapped[int] = mapped_column(Integer, default=0)
+    keywords: Mapped[list[str]] = mapped_column(JSON, default=list)
+    sub_topics: Mapped[list[str]] = mapped_column(JSON, default=list)
+    syllabus: Mapped[Syllabus] = relationship(back_populates="topics")
+
+
+class ChunkTopic(Base):
+    __tablename__ = "chunk_topics"
+    __table_args__ = (UniqueConstraint("chunk_id", "topic_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    chunk_id: Mapped[int] = mapped_column(
+        ForeignKey("chunks.id", ondelete="CASCADE"), index=True
+    )
+    topic_id: Mapped[int] = mapped_column(
+        ForeignKey("syllabus_topics.id", ondelete="CASCADE"), index=True
+    )
+    score: Mapped[float] = mapped_column(Float, default=0.0)
+    source: Mapped[str] = mapped_column(String(16), default="auto")
+    page_start: Mapped[int | None] = mapped_column(Integer)
+    page_end: Mapped[int | None] = mapped_column(Integer)
+
+
 class ChatSession(TimestampMixin, Base):
     __tablename__ = "chat_sessions"
 
@@ -254,6 +303,9 @@ class Question(Base):
     explanation: Mapped[str | None] = mapped_column(Text)
     engine: Mapped[str] = mapped_column(String(16), default="classic")
     topic: Mapped[str] = mapped_column(String(255), default="General")
+    syllabus_topic_id: Mapped[int | None] = mapped_column(
+        ForeignKey("syllabus_topics.id", ondelete="SET NULL"), index=True
+    )
     page: Mapped[int] = mapped_column(Integer, default=1)
     source_chunk_id: Mapped[int | None] = mapped_column(
         ForeignKey("chunks.id", ondelete="SET NULL")

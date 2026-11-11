@@ -4,6 +4,7 @@ from app.models.entities import (
     AttemptAnswer,
     ChatSession,
     Chunk,
+    ChunkTopic,
     Document,
     DocumentKeyTerm,
     DocumentPage,
@@ -22,6 +23,8 @@ from app.models.entities import (
     RefreshToken,
     StudyPlan,
     StudyPlanItem,
+    Syllabus,
+    SyllabusTopic,
     TopicStat,
     User,
 )
@@ -30,6 +33,7 @@ __all__ = [
     "AttemptAnswer",
     "ChatSession",
     "Chunk",
+    "ChunkTopic",
     "Document",
     "DocumentKeyTerm",
     "DocumentPage",
@@ -48,6 +52,8 @@ __all__ = [
     "RefreshToken",
     "StudyPlan",
     "StudyPlanItem",
+    "Syllabus",
+    "SyllabusTopic",
     "TopicStat",
     "User",
 ]

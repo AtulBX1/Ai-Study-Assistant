@@ -229,6 +229,23 @@ def ingest_document(
         )
         db.commit()
         _record_state(db, document, "ready", 100)
+        from app.core.config import get_settings
+        from app.models import Syllabus
+        from app.services.embeddings import get_embedding_service
+        from app.services.syllabus import remap_syllabus
+
+        mapper = get_embedding_service()
+        for syllabus in db.scalars(
+            select(Syllabus).where(Syllabus.owner_id == document.owner_id)
+        ):
+            remap_syllabus(
+                db,
+                syllabus,
+                document.owner_id,
+                mapper,
+                get_settings().syllabus_mapping_threshold,
+            )
+        db.commit()
     except Exception as error:
         db.rollback()
         failed_document = db.scalar(select(Document).where(Document.id == document_id))

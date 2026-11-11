@@ -15,12 +15,15 @@ from app.dependencies.auth import DatabaseSession, get_current_user
 from app.models import (
     AttemptAnswer,
     Chunk,
+    ChunkTopic,
     Document,
     DocumentKeyTerm,
     DocumentPage,
     Question,
     Quiz,
     QuizAttempt,
+    Syllabus,
+    SyllabusTopic,
     TopicStat,
     User,
 )
@@ -192,21 +195,70 @@ def create_quiz(
     request: GenerationRequest, db: DatabaseSession, user: AuthenticatedUser
 ) -> dict[str, Any]:
     """Generate a bounded quiz from only the authenticated user's ready documents."""
+    scoped_topic_names: dict[int, str] = {}
+    syllabus_chunk_ids: set[int] | None = None
+    if request.syllabus_id is not None:
+        syllabus = db.scalar(
+            select(Syllabus).where(
+                Syllabus.id == request.syllabus_id, Syllabus.owner_id == user.id
+            )
+        )
+        if syllabus is None:
+            raise HTTPException(404, "Syllabus not found.")
+        topic_query = select(SyllabusTopic).where(
+            SyllabusTopic.syllabus_id == syllabus.id
+        )
+        if request.topic_ids:
+            topic_query = topic_query.where(SyllabusTopic.id.in_(request.topic_ids))
+        selected_topics = list(db.scalars(topic_query))
+        if request.topic_ids and len(selected_topics) != len(set(request.topic_ids)):
+            raise HTTPException(404, "One or more syllabus topics were not found.")
+        scoped_topic_names = {topic.id: topic.title for topic in selected_topics}
+        if selected_topics:
+            syllabus_chunk_ids = set(
+                db.scalars(
+                    select(ChunkTopic.chunk_id).where(
+                        ChunkTopic.topic_id.in_(scoped_topic_names),
+                        ChunkTopic.source.in_(["auto", "manual"]),
+                    )
+                )
+            )
+        else:
+            syllabus_chunk_ids = set()
+        if not syllabus_chunk_ids:
+            names = ", ".join(scoped_topic_names.values()) or "selected topics"
+            return {
+                "id": None,
+                "title": request.title,
+                "engine": request.engine,
+                "questions": 0,
+                "message": f"no material found for {names}",
+                "report": {"accepted": 0},
+            }
+    document_ids = request.document_ids
+    if not document_ids and syllabus_chunk_ids:
+        document_ids = list(
+            db.scalars(
+                select(Chunk.doc_id).where(Chunk.id.in_(syllabus_chunk_ids)).distinct()
+            )
+        )
     documents = list(
         db.scalars(
             select(Document).where(
-                Document.id.in_(request.document_ids),
+                Document.id.in_(document_ids),
                 Document.owner_id == user.id,
                 Document.status == "ready",
             )
         )
     )
-    if len(documents) != len(set(request.document_ids)):
+    if len(documents) != len(set(document_ids)):
         raise HTTPException(
             status_code=404, detail="One or more ready documents were not found."
         )
     doc_by_id = {doc.id: doc for doc in documents}
     query = select(Chunk).where(Chunk.doc_id.in_(doc_by_id))
+    if syllabus_chunk_ids is not None:
+        query = query.where(Chunk.id.in_(syllabus_chunk_ids))
     if request.chunk_ids:
         query = query.where(Chunk.id.in_(request.chunk_ids))
     if request.page_start:
@@ -357,7 +409,28 @@ def create_quiz(
         engine_label: str,
     ) -> None:
         nonlocal attempted, ai_engine, fallback_reason
-        topic = chunk.section or (request.topics[0] if request.topics else "General")
+        mapped_ids = (
+            list(
+                db.scalars(
+                    select(ChunkTopic.topic_id)
+                    .where(
+                        ChunkTopic.chunk_id == chunk.id,
+                        ChunkTopic.topic_id.in_(scoped_topic_names)
+                        if scoped_topic_names
+                        else False,
+                    )
+                    .order_by(ChunkTopic.score.desc())
+                )
+            )
+            if request.syllabus_id is not None
+            else []
+        )
+        topic = (
+            scoped_topic_names[mapped_ids[0]]
+            if mapped_ids
+            else chunk.section or (request.topics[0] if request.topics else "General")
+        )
+        topic = topic or chunk.section or "General"
         chunk.key_terms = terms_by_doc[chunk.doc_id]
         source_text = clean_chunk_text(chunk.text)
         generation_chunk = SimpleNamespace(
@@ -382,9 +455,8 @@ def create_quiz(
             )
             if engine_label == "ai":
                 provider = getattr(engine, "provider", None)
-                provider_name = (
-                    getattr(provider, "last_provider", "")
-                    or getattr(provider, "name", "")
+                provider_name = getattr(provider, "last_provider", "") or getattr(
+                    provider, "name", ""
                 )
                 for item in generated:
                     item.provider = item.provider or provider_name or None
@@ -460,6 +532,8 @@ def create_quiz(
             if not ok:
                 reject(reason, kind)
                 continue
+            if request.syllabus_id is not None:
+                candidate.topic = topic
             accepted.append(candidate)
             remaining[kind] -= 1
             generated_engines.add(engine_label)
@@ -559,6 +633,22 @@ def create_quiz(
                 source_chunk_id=item.source_chunk_id,
                 engine=item.engine,
                 topic=item.topic,
+                syllabus_topic_id=next(
+                    (
+                        topic_id
+                        for topic_id, title in scoped_topic_names.items()
+                        if title == item.topic
+                        and db.scalar(
+                            select(ChunkTopic.id).where(
+                                ChunkTopic.chunk_id == item.source_chunk_id,
+                                ChunkTopic.topic_id == topic_id,
+                            )
+                        )
+                    ),
+                    None,
+                )
+                if request.syllabus_id is not None
+                else None,
                 page=item.page,
             )
         )

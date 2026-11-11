@@ -43,6 +43,7 @@ class Settings(BaseSettings):
     reranker_model_name: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
     embedding_device: str = "cpu"
     embedding_batch_size: int = Field(default=16, ge=1, le=256)
+    syllabus_mapping_threshold: float = Field(default=0.35, ge=-1, le=1)
     hybrid_dense_weight: float = Field(default=0.5, ge=0, le=1)
     rrf_k: int = Field(default=60, ge=1)
     max_pdf_size_bytes: int = Field(default=20 * 1024 * 1024, gt=0)
