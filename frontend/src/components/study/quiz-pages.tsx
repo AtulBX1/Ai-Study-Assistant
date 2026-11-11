@@ -10,21 +10,15 @@ import {
   useState,
   type FormEvent,
 } from "react";
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+import dynamic from "next/dynamic";
+const QuizChart = dynamic(() => import("@/components/study/quiz-chart"), { ssr: false, loading: () => <div className="h-64 animate-pulse rounded bg-muted" /> });
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
 import { PageHeader } from "@/components/ui/page-header";
 import type { DocumentRecord } from "@/lib/documents";
+import { listSyllabi, getSyllabus, type SyllabusSummary, type SyllabusNode } from "@/lib/syllabus";
 import { listDocuments } from "@/lib/documents";
 import {
   createQuiz,
@@ -53,6 +47,18 @@ const questionTypes = [
 
 function isRecord(value: unknown): value is JsonRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function rejectReasonLabel(value: string): string {
+  const known: Record<string, string> = {
+    insufficient_valid_questions: "not enough valid questions could be produced",
+    provider_unavailable: "AI provider unavailable",
+    rate_limited: "AI provider busy",
+    invalid_question: "question format was invalid",
+    evidence_mismatch: "question did not match source evidence",
+    duplicate: "question repeated another candidate",
+  };
+  return known[value] ?? value.replaceAll("_", " ");
 }
 
 function sourceDocumentId(url: string | null): number | null {
@@ -271,10 +277,14 @@ export function QuizBuilderPage({
   prefillDocumentId,
   prefillQuestionCount,
   prefillTitle,
+  prefillSyllabusId,
+  prefillTopicId,
 }: {
   prefillDocumentId?: number;
   prefillQuestionCount?: number;
   prefillTitle?: string;
+  prefillSyllabusId?: number;
+  prefillTopicId?: number;
 }) {
   const router = useRouter();
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
@@ -282,10 +292,15 @@ export function QuizBuilderPage({
   const [documentError, setDocumentError] = useState<string | null>(null);
   const [documentId, setDocumentId] = useState("");
   const [title, setTitle] = useState("");
-  const [scope, setScope] = useState<"whole" | "pages" | "topic">("whole");
+  const [scope, setScope] = useState<"whole" | "pages" | "topic" | "syllabus">(prefillTopicId ? "syllabus" : "whole");
+  const [syllabi, setSyllabi] = useState<SyllabusSummary[]>([]);
+  const [syllabusId, setSyllabusId] = useState(prefillSyllabusId ?? 0);
+  const [syllabusTopics, setSyllabusTopics] = useState<SyllabusNode[]>([]);
+  const [syllabusTopicId, setSyllabusTopicId] = useState(prefillTopicId ?? 0);
   const [pageStart, setPageStart] = useState("1");
   const [pageEnd, setPageEnd] = useState("");
   const [topic, setTopic] = useState("");
+  const [selectedTypes, setSelectedTypes] = useState<string[]>(questionTypes.map(([value]) => value));
   const [questionCount, setQuestionCount] = useState(String(prefillQuestionCount ?? 10));
   const [difficulty, setDifficulty] = useState<"mixed" | "easy" | "medium" | "hard">("mixed");
   const [engine, setEngine] = useState<"auto" | "classic" | "llm">("auto");
@@ -301,6 +316,13 @@ export function QuizBuilderPage({
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    void listSyllabi().then(setSyllabi).catch(() => setSyllabi([]));
+  }, []);
+  useEffect(() => {
+    if (!syllabusId) { setSyllabusTopics([]); return; }
+    void getSyllabus(syllabusId).then((value) => { const flatten = (nodes: SyllabusNode[]): SyllabusNode[] => nodes.flatMap((n) => [n, ...flatten(n.children ?? [])]); setSyllabusTopics(flatten(value.tree)); }).catch(() => setSyllabusTopics([]));
+  }, [syllabusId]);
   useEffect(() => {
     let active = true;
     void listDocuments(0, 100)
@@ -347,8 +369,10 @@ export function QuizBuilderPage({
           ? { page_start: Number(pageStart), ...(pageEnd ? { page_end: Number(pageEnd) } : {}) }
           : {}),
         ...(scope === "topic" && topic.trim() ? { topics: [topic.trim()] } : {}),
-        question_count: requested,
-        engine: engine === "llm" ? "llm" : "classic",
+        ...(scope === "syllabus" ? { syllabus_id: syllabusId, topic_ids: syllabusTopicId ? [syllabusTopicId] : [] } : {}),
+        count: requested,
+        question_types: selectedTypes as never,
+        engine: engine === "llm" ? "ai" : engine === "classic" ? "offline" : "auto",
         difficulty: difficulty === "mixed" ? null : difficulty,
       });
       let engineCounts: Record<string, number> = {};
@@ -411,10 +435,10 @@ export function QuizBuilderPage({
         <fieldset className="space-y-2">
           <legend className="text-sm font-medium">Scope</legend>
           <div className="flex flex-wrap gap-4 text-sm">
-            {(["whole", "pages", "topic"] as const).map((value) => (
+            {(["whole", "pages", "topic", "syllabus"] as const).map((value) => (
               <label key={value} className="inline-flex items-center gap-2">
                 <input type="radio" name="scope" value={value} checked={scope === value} onChange={() => setScope(value)} />
-                {value === "whole" ? "Whole document" : value === "pages" ? "Page range" : "Chapter / topic"}
+                {value === "whole" ? "Whole document" : value === "pages" ? "Page range" : value === "topic" ? "Chapter / topic" : "By syllabus topic"}
               </label>
             ))}
           </div>
@@ -434,17 +458,18 @@ export function QuizBuilderPage({
             <input className="w-full rounded-md border border-border bg-background px-3 py-2" value={topic} onChange={(event) => setTopic(event.target.value)} placeholder="For example, Unit II — Word2Vec" />
           </label>
         ) : null}
+        {scope === "syllabus" ? <div className="grid gap-3 sm:grid-cols-2"><label className="space-y-2 text-sm">Syllabus<select aria-label="Syllabus" className="w-full rounded border bg-background p-2" value={syllabusId || ""} onChange={(e) => { setSyllabusId(Number(e.target.value)); setSyllabusTopicId(0); }}><option value="">Choose syllabus</option>{syllabi.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label><label className="space-y-2 text-sm">Topic<select aria-label="Syllabus topic" className="w-full rounded border bg-background p-2" value={syllabusTopicId || ""} onChange={(e) => setSyllabusTopicId(Number(e.target.value))}><option value="">All syllabus topics</option>{syllabusTopics.map((item) => <option key={item.id ?? item.title} value={item.id}>{item.title}</option>)}</select></label></div> : null}
         <fieldset className="space-y-2">
           <legend className="text-sm font-medium">Question types</legend>
           <div className="grid gap-2 sm:grid-cols-2">
             {questionTypes.map(([value, label]) => (
               <label key={value} className="flex items-center gap-2 text-sm">
-                <input type="checkbox" disabled aria-label={label} />
+                <input type="checkbox" aria-label={label} checked={selectedTypes.includes(value)} onChange={(event) => setSelectedTypes((current) => event.target.checked ? [...current, value] : current.filter((item) => item !== value))} />
                 {label}
               </label>
             ))}
           </div>
-          <p className="text-xs text-muted-foreground">The current generation API selects validated question types automatically; type filtering is not supported yet.</p>
+          <p className="text-xs text-muted-foreground">Choose one or more types. The requested count is distributed across them.</p>
         </fieldset>
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="space-y-2 text-sm">Question count
@@ -499,8 +524,11 @@ export function QuizBuilderPage({
             <CardContent className="space-y-3 p-5">
               <h2 className="font-semibold">Generation complete</h2>
               <EngineBadge engine={generated.engine} />
+              {Object.keys(generated.engineCounts).length > 0 ? <p className="text-sm">Engine counts: {Object.entries(generated.engineCounts).map(([name, count]) => `${engineLabel(name)} ${count}`).join(" · ")}</p> : null}
               {summary ? <p className="text-sm">{summary}</p> : null}
               {generated.engineDetailsError ? <p className="text-sm text-muted-foreground" role="status">Question engine details could not be verified: {generated.engineDetailsError}</p> : null}
+              {isRecord(generated.report.by_type) ? <div className="text-sm"><h3 className="font-medium">Produced / requested by type</h3><ul className="mt-1 grid grid-cols-2 gap-1">{Object.entries(generated.report.by_type).map(([kind, value]) => { const row = isRecord(value) ? value : {}; return <li key={kind}>{kind.replaceAll("_", " ")}: {typeof row.produced === "number" ? row.produced : 0} / {typeof row.requested === "number" ? row.requested : 0}</li>; })}</ul></div> : null}
+              {isRecord(generated.report.top_reject_reasons) ? <div className="text-sm"><h3 className="font-medium">Why some candidates were rejected</h3><ul className="mt-1">{Object.entries(generated.report.top_reject_reasons).slice(0, 3).map(([reason, amount]) => { const count = typeof amount === "number" ? amount : 0; return <li key={reason}>{rejectReasonLabel(reason)}: {count} candidate{count === 1 ? "" : "s"}</li>; })}</ul></div> : null}
               <p className="text-sm text-muted-foreground">
                 {generated.actual < generated.requested
                   ? `The backend returned ${generated.actual} of ${generated.requested} requested questions. You can accept the shorter quiz or generate the remaining questions as a separate quiz; the API cannot append to an existing quiz.`
@@ -518,7 +546,7 @@ export function QuizBuilderPage({
                     Add more (new quiz)
                   </Button>
                 ) : null}
-                <Link href="/quizzes"><Button variant="outline">Retry later</Button></Link>
+                <Button variant="outline" onClick={() => { setGenerated(null); setStatus("idle"); document.querySelector<HTMLFormElement>("form")?.requestSubmit(); }}>Retry generation</Button>
               </div>
             </CardContent>
           </Card>
@@ -878,15 +906,7 @@ export function QuizResultsPage({
             <h2 id="topic-accuracy" className="mb-3 text-lg font-semibold">Per-topic accuracy</h2>
             {chartData.length ? (
               <div className="h-64 w-full" role="img" aria-label="Per-topic accuracy chart">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={chartData} margin={{ top: 8, right: 12, bottom: 8, left: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="topic" />
-                    <YAxis domain={[0, 100]} unit="%" />
-                    <Tooltip formatter={(value) => [`${value}%`, "Accuracy"]} />
-                    <Bar dataKey="accuracy" fill="hsl(var(--primary))" />
-                  </BarChart>
-                </ResponsiveContainer>
+                <QuizChart data={chartData} />
               </div>
             ) : <p className="text-sm text-muted-foreground">Topic accuracy was not provided for this attempt.</p>}
             <p className="text-sm" aria-live="polite">

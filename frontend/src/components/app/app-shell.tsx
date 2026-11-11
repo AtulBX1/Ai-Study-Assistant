@@ -31,6 +31,7 @@ const navigation = [
   { label: "Chat", href: "/chat", icon: MessageSquareText },
   { label: "Quizzes", href: "/quizzes", icon: ClipboardList },
   { label: "Flashcards", href: "/flashcards", icon: Layers3 },
+  { label: "Syllabus", href: "/syllabus", icon: BookOpen },
   { label: "Study Tools", href: "/study-tools", icon: Sparkles },
   { label: "Test Library", href: "/test-library", icon: BookOpen },
   { label: "My Progress", href: "/progress", icon: ChartNoAxesCombined },
@@ -58,6 +59,7 @@ export function NavigationLinks({
           <Link
             key={href}
             href={href}
+            prefetch
             aria-current={active ? "page" : undefined}
             onClick={onNavigate}
             className={cn(

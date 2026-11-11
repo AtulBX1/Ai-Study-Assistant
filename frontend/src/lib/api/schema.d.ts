@@ -1287,7 +1287,7 @@ export interface paths {
         put?: never;
         /**
          * Generate Flashcards
-         * @description Create missing cards from accepted questions and the stored glossary.
+         * @description Create page-scoped document flashcards, optionally adding wrong answers.
          */
         post: operations["generate_flashcards_study_documents__document_id__flashcards_generate_post"];
         delete?: never;
@@ -1752,6 +1752,164 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/syllabi/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview */
+        post: operations["preview_syllabi_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/syllabi": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Syllabi */
+        get: operations["list_syllabi_syllabi_get"];
+        put?: never;
+        /** Create */
+        post: operations["create_syllabi_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/syllabi/{syllabus_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get */
+        get: operations["get_syllabi__syllabus_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Syllabus */
+        delete: operations["delete_syllabus_syllabi__syllabus_id__delete"];
+        options?: never;
+        head?: never;
+        /** Rename */
+        patch: operations["rename_syllabi__syllabus_id__patch"];
+        trace?: never;
+    };
+    "/syllabi/{syllabus_id}/topics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add Topic */
+        post: operations["add_topic_syllabi__syllabus_id__topics_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/syllabi/{syllabus_id}/topics/{topic_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Topic */
+        delete: operations["delete_topic_syllabi__syllabus_id__topics__topic_id__delete"];
+        options?: never;
+        head?: never;
+        /** Edit Topic */
+        patch: operations["edit_topic_syllabi__syllabus_id__topics__topic_id__patch"];
+        trace?: never;
+    };
+    "/syllabi/{syllabus_id}/remap": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Remap */
+        post: operations["remap_syllabi__syllabus_id__remap_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/syllabi/{syllabus_id}/coverage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Coverage */
+        get: operations["get_coverage_syllabi__syllabus_id__coverage_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/syllabi/{syllabus_id}/analytics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Syllabus Analytics */
+        get: operations["syllabus_analytics_syllabi__syllabus_id__analytics_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/syllabi/{syllabus_id}/topics/{topic_id}/chunks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Attach Pages */
+        post: operations["attach_pages_syllabi__syllabus_id__topics__topic_id__chunks_post"];
+        /** Detach Pages */
+        delete: operations["detach_pages_syllabi__syllabus_id__topics__topic_id__chunks_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/export/{kind}/{item_id}": {
         parameters: {
             query?: never;
@@ -2090,6 +2248,8 @@ export interface components {
             page_count: number | null;
             /** Language */
             language: string | null;
+            /** Is Private */
+            is_private: boolean;
             /**
              * Created At
              * Format: date-time
@@ -2192,6 +2352,15 @@ export interface components {
             /** Refresh Token */
             refresh_token: string;
         };
+        /** ManualMap */
+        ManualMap: {
+            /** Document Id */
+            document_id: number;
+            /** Page Start */
+            page_start: number;
+            /** Page End */
+            page_end: number;
+        };
         /** MetadataUpdate */
         MetadataUpdate: {
             /** Title */
@@ -2275,6 +2444,11 @@ export interface components {
             /** Steps */
             steps?: string[];
         };
+        /** PreviewRequest */
+        PreviewRequest: {
+            /** Text */
+            text: string;
+        };
         /** PublicProfileUpdate */
         PublicProfileUpdate: {
             /** Public Handle */
@@ -2294,6 +2468,16 @@ export interface components {
             /** Answer */
             answer?: string | null;
         };
+        /**
+         * QuestionType
+         * @enum {string}
+         */
+        QuestionType: "multiple_choice" | "true_false" | "fill_in_the_blank" | "short_answer";
+        /**
+         * QuizEngine
+         * @enum {string}
+         */
+        QuizEngine: "auto" | "offline" | "ai";
         /**
          * RechunkRequest
          * @description Optional chunk size and sentence-overlap settings.
@@ -2465,6 +2649,20 @@ export interface components {
             /** Suspended */
             suspended: boolean;
         };
+        /** SyllabusCreate */
+        SyllabusCreate: {
+            /** Title */
+            title: string;
+            /** Text */
+            text?: string | null;
+            /** Document Id */
+            document_id?: number | null;
+        };
+        /** SyllabusRename */
+        SyllabusRename: {
+            /** Title */
+            title: string;
+        };
         /** TestMetadata */
         TestMetadata: {
             /** Title */
@@ -2490,6 +2688,35 @@ export interface components {
              */
             token_type: string;
             user: components["schemas"]["UserResponse"];
+        };
+        /** TopicCreate */
+        TopicCreate: {
+            /** Title */
+            title: string;
+            /** Parent Id */
+            parent_id?: number | null;
+            /**
+             * Order
+             * @default 0
+             */
+            order: number;
+            /** Keywords */
+            keywords?: string[];
+            /** Sub Topics */
+            sub_topics?: string[];
+        };
+        /** TopicEdit */
+        TopicEdit: {
+            /** Title */
+            title?: string | null;
+            /** Parent Id */
+            parent_id?: number | null;
+            /** Order */
+            order?: number | null;
+            /** Keywords */
+            keywords?: string[] | null;
+            /** Sub Topics */
+            sub_topics?: string[] | null;
         };
         /**
          * TransformerSummaryRequest
@@ -2603,25 +2830,30 @@ export interface components {
              */
             title: string;
             /** Document Ids */
-            document_ids: number[];
+            document_ids?: number[];
+            /** Syllabus Id */
+            syllabus_id?: number | null;
+            /** Topic Ids */
+            topic_ids?: number[];
             /** Page Start */
             page_start?: number | null;
             /** Page End */
             page_end?: number | null;
+            /** Chapter */
+            chapter?: string | null;
             /** Topics */
             topics?: string[];
             /** Chunk Ids */
             chunk_ids?: number[];
+            /** Question Types */
+            question_types?: components["schemas"]["QuestionType"][];
             /**
-             * Question Count
+             * Count
              * @default 10
              */
-            question_count: number;
-            /**
-             * Engine
-             * @default classic
-             */
-            engine: string;
+            count: number;
+            /** @default auto */
+            engine: components["schemas"]["QuizEngine"];
             difficulty?: components["schemas"]["Difficulty"] | null;
         };
     };
@@ -4957,7 +5189,13 @@ export interface operations {
     };
     generate_flashcards_study_documents__document_id__flashcards_generate_post: {
         parameters: {
-            query?: never;
+            query?: {
+                count?: number;
+                page_start?: number | null;
+                page_end?: number | null;
+                chapter?: string | null;
+                also_add_wrong_answers?: boolean;
+            };
             header?: never;
             path: {
                 document_id: number;
@@ -5852,6 +6090,477 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["DocumentComparisonRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_syllabi_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_syllabi_syllabi_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
+                };
+            };
+        };
+    };
+    create_syllabi_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SyllabusCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_syllabi__syllabus_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                syllabus_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_syllabus_syllabi__syllabus_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                syllabus_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rename_syllabi__syllabus_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                syllabus_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SyllabusRename"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_topic_syllabi__syllabus_id__topics_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                syllabus_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TopicCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_topic_syllabi__syllabus_id__topics__topic_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                syllabus_id: number;
+                topic_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    edit_topic_syllabi__syllabus_id__topics__topic_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                syllabus_id: number;
+                topic_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TopicEdit"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remap_syllabi__syllabus_id__remap_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                syllabus_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_coverage_syllabi__syllabus_id__coverage_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                syllabus_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    syllabus_analytics_syllabi__syllabus_id__analytics_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                syllabus_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    attach_pages_syllabi__syllabus_id__topics__topic_id__chunks_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                syllabus_id: number;
+                topic_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ManualMap"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    detach_pages_syllabi__syllabus_id__topics__topic_id__chunks_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                syllabus_id: number;
+                topic_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ManualMap"];
             };
         };
         responses: {

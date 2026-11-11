@@ -95,4 +95,13 @@ describe("flashcard screens", () => {
     render(<FlashcardDecksPage />);
     expect(await screen.findByText("No ready documents")).toBeTruthy();
   });
+
+  it("reports source counts and a plain language shortfall", async () => {
+    mocks.listDocuments.mockResolvedValue([{ id: 4, title: "Course.pdf", status: "ready", page_count: 8 }]);
+    mocks.getFlashcardDeckStats.mockResolvedValue({ documentId: 4, deck: "Course.pdf", total: 0, due: 0, suspended: 0 });
+    mocks.generateFlashcards.mockResolvedValue({ created: 1, requested: 20, createdBySource: { glossary: 1, cloze: 0, ai: 0 }, shortfallReasons: { insufficient_grounded_facts: 19 } });
+    render(<FlashcardDecksPage />);
+    fireEvent.click(await screen.findByRole("button", { name: "Generate cards" }));
+    expect(await screen.findByText(/Created 1 of 20 requested cards: glossary 1, cloze 0, AI 0\. Shortfall: insufficient grounded facts/)).toBeTruthy();
+  });
 });

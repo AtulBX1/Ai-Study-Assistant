@@ -131,6 +131,18 @@ describe("quiz screens", () => {
     expect(screen.getByText("AI provider is disabled because this document is private.")).toBeTruthy();
   });
 
+  it("enables AI for public documents and sends the selected question types", async () => {
+    mocks.listDocuments.mockResolvedValue([{ id: 4, title: "Public.pdf", status: "ready", is_private: false, page_count: 7 }]);
+    mocks.createQuiz.mockResolvedValue({ id: 3, title: "Unit II review", engine: "offline", questionCount: 10, report: {} });
+    render(<QuizBuilderPage />);
+    const ai = await screen.findByRole("radio", { name: "AI provider" });
+    expect((ai as HTMLInputElement).disabled).toBe(false);
+    fireEvent.click(screen.getByRole("checkbox", { name: "True / false" }));
+    fireEvent.click(screen.getByRole("button", { name: "Generate quiz" }));
+    await waitFor(() => expect(mocks.createQuiz).toHaveBeenCalled());
+    expect(mocks.createQuiz.mock.calls[0][0]).toMatchObject({ question_types: ["multiple_choice", "fill_in_the_blank", "short_answer"] });
+  });
+
   it("shows partial-result transparency and per-question engine counts", async () => {
     mocks.listDocuments.mockResolvedValue([{
       id: 4,
@@ -154,7 +166,7 @@ describe("quiz screens", () => {
     await screen.findByRole("button", { name: "Generate quiz" });
     fireEvent.click(screen.getByRole("button", { name: "Generate quiz" }));
     expect(await screen.findByText(/Generated 7 of 10 questions: the AI provider was rate limited/)).toBeTruthy();
-    expect(screen.getByText(/Offline \(classic\) 7/)).toBeTruthy();
+    expect(screen.getAllByText(/Offline \(classic\) 7/).length).toBeGreaterThan(0);
     expect(screen.getAllByText("Offline (classic)").length).toBeGreaterThan(0);
   });
 

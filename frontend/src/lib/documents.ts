@@ -2,7 +2,7 @@ import { apiClient, unwrapApiResult } from "@/lib/api";
 import type { components } from "@/lib/api/schema";
 import { normalizeApiError } from "@/lib/errors";
 
-export type DocumentRecord = components["schemas"]["DocumentResponse"] & {
+export type DocumentRecord = Omit<components["schemas"]["DocumentResponse"], "is_private"> & {
   is_private?: boolean;
 };
 

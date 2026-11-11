@@ -85,16 +85,19 @@ export async function getFlashcardDeckStats(
 
 export async function generateFlashcards(
   documentId: number,
-): Promise<{ created: number }> {
+  options: { count?: number; page_start?: number; page_end?: number; chapter?: string } = {},
+): Promise<{ created: number; requested: number; createdBySource: Record<string, number>; shortfallReasons: Record<string, number> }> {
   const result = await apiClient.POST(
     "/study/documents/{document_id}/flashcards/generate",
-    { params: { path: { document_id: documentId } } },
+    { params: { path: { document_id: documentId }, query: options } },
   );
   const data: unknown = unwrapApiResult(result);
   if (!isRecord(data) || typeof data.created !== "number") {
     throw new Error("The flashcard generation response was invalid.");
   }
-  return { created: data.created };
+  const bySource = isRecord(data.created_by_source) ? data.created_by_source : {};
+  const reasons = isRecord(data.shortfall_reasons) ? data.shortfall_reasons : {};
+  return { created: data.created, requested: typeof data.requested === "number" ? data.requested : options.count ?? 40, createdBySource: Object.fromEntries(Object.entries(bySource).filter((entry): entry is [string, number] => typeof entry[1] === "number")), shortfallReasons: Object.fromEntries(Object.entries(reasons).filter((entry): entry is [string, number] => typeof entry[1] === "number")) };
 }
 
 export async function reviewFlashcard(

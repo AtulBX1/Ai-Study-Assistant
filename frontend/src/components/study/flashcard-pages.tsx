@@ -16,7 +16,7 @@ function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : "The flashcard request could not be completed.";
 }
 
-export function FlashcardDecksPage() {
+export function FlashcardDecksPage({ prefillDocumentId, prefillTopic }: { prefillDocumentId?: number; prefillTopic?: string } = {}) {
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
   const [decks, setDecks] = useState<Record<number, FlashcardDeckStats>>({});
   const [newCounts, setNewCounts] = useState<Record<number, number>>({});
@@ -24,6 +24,10 @@ export function FlashcardDecksPage() {
   const [error, setError] = useState<string | null>(null);
   const [generating, setGenerating] = useState<number | null>(null);
   const [notice, setNotice] = useState<Record<number, string>>({});
+  const [scope, setScope] = useState<Record<number, "document" | "pages" | "topic">>(prefillTopic ? { [prefillDocumentId ?? 0]: "topic" } : {});
+  const [pageRanges, setPageRanges] = useState<Record<number, [string, string]>>({});
+  const [topics, setTopics] = useState<Record<number, string>>(prefillTopic ? { [prefillDocumentId ?? 0]: prefillTopic } : {});
+  const [counts, setCounts] = useState<Record<number, string>>({});
 
   const load = useCallback(async () => {
     setError(null);
@@ -33,6 +37,10 @@ export function FlashcardDecksPage() {
       getDueFlashcards(),
     ]);
     setDocuments(docs);
+    if (prefillTopic && prefillDocumentId && docs.some((doc) => doc.id === prefillDocumentId)) {
+      setScope((current) => ({ ...current, [prefillDocumentId]: "topic" }));
+      setTopics((current) => ({ ...current, [prefillDocumentId]: prefillTopic }));
+    }
     setDecks(Object.fromEntries(stats.map((item) => [item.documentId, item])));
     setNewCounts(
       dueCards.reduce<Record<number, number>>((counts, card) => {
@@ -40,7 +48,7 @@ export function FlashcardDecksPage() {
         return counts;
       }, {}),
     );
-  }, []);
+  }, [prefillDocumentId, prefillTopic]);
 
   useEffect(() => {
     let active = true;
@@ -54,12 +62,16 @@ export function FlashcardDecksPage() {
     setGenerating(document.id);
     setNotice((current) => ({ ...current, [document.id]: "" }));
     try {
-      const result = await generateFlashcards(document.id);
+      const selectedScope = scope[document.id] ?? "document";
+      const range = pageRanges[document.id] ?? ["1", String(document.page_count ?? "")];
+      const result = await generateFlashcards(document.id, {
+        count: Number(counts[document.id] || 20),
+        ...(selectedScope === "pages" ? { page_start: Number(range[0]), ...(range[1] ? { page_end: Number(range[1]) } : {}) } : {}),
+        ...(selectedScope === "topic" && topics[document.id] ? { chapter: topics[document.id] } : {}),
+      });
       setNotice((current) => ({
         ...current,
-        [document.id]: result.created
-          ? `Generated ${result.created} new card${result.created === 1 ? "" : "s"}.`
-          : "No new cards could be generated from this document. It may not contain any new grounded facts.",
+        [document.id]: `Created ${result.created} of ${result.requested} requested cards: glossary ${result.createdBySource.glossary ?? 0}, cloze ${result.createdBySource.cloze ?? 0}, AI ${result.createdBySource.ai ?? 0}.${result.created < result.requested ? ` Shortfall: ${Object.keys(result.shortfallReasons).length ? Object.keys(result.shortfallReasons).map((key) => key.replaceAll("_", " ")).join(", ") : "not enough new grounded facts were available"}.` : ""}`,
       }));
       await load();
     } catch (reason) {
@@ -88,13 +100,19 @@ export function FlashcardDecksPage() {
         {documents.map((document) => {
           const stats = decks[document.id];
           return (
-            <Card key={document.id}>
+          <Card key={document.id}>
               <CardContent className="space-y-4 p-5">
                 <h2 className="font-semibold">{document.title}</h2>
                 <div className="grid grid-cols-3 gap-2 text-sm">
                   <p>Total <strong className="block">{stats?.total ?? "—"}</strong></p>
                   <p>Due today <strong className="block">{stats?.due ?? "—"}</strong></p>
                   <p>New <strong className="block">{newCounts[document.id] ?? 0}</strong></p>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <label className="text-sm">Generation scope <select aria-label={`Scope for ${document.title}`} className="ml-2 rounded border bg-background p-2" value={scope[document.id] ?? "document"} onChange={(e) => setScope((v) => ({ ...v, [document.id]: e.target.value as "document" | "pages" | "topic" }))}><option value="document">Document</option><option value="pages">Page range</option><option value="topic">Topic</option></select></label>
+                  <label className="text-sm">Count <input aria-label={`Card count for ${document.title}`} className="ml-2 w-20 rounded border bg-background p-2" type="number" min="1" max="40" value={counts[document.id] ?? "20"} onChange={(e) => setCounts((v) => ({ ...v, [document.id]: e.target.value }))} /></label>
+                  {scope[document.id] === "pages" && <div className="flex gap-2"><input aria-label="Page from" type="number" min="1" className="w-24 rounded border bg-background p-2" placeholder="From" value={(pageRanges[document.id] ?? ["1", ""])[0]} onChange={(e) => setPageRanges((v) => ({ ...v, [document.id]: [e.target.value, (v[document.id] ?? ["1", ""])[1]] }))} /><input aria-label="Page to" type="number" min="1" className="w-24 rounded border bg-background p-2" placeholder="To" value={(pageRanges[document.id] ?? ["1", ""])[1]} onChange={(e) => setPageRanges((v) => ({ ...v, [document.id]: [(v[document.id] ?? ["1", ""])[0], e.target.value] }))} /></div>}
+                  {scope[document.id] === "topic" && <input aria-label="Flashcard topic" className="rounded border bg-background p-2" placeholder="Topic" value={topics[document.id] ?? ""} onChange={(e) => setTopics((v) => ({ ...v, [document.id]: e.target.value }))} />}
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <Button disabled={generating === document.id} onClick={() => void generate(document)}>

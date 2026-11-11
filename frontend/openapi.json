@@ -3845,7 +3845,7 @@
           "study"
         ],
         "summary": "Generate Flashcards",
-        "description": "Create missing cards from accepted questions and the stored glossary.",
+        "description": "Create page-scoped document flashcards, optionally adding wrong answers.",
         "operationId": "generate_flashcards_study_documents__document_id__flashcards_generate_post",
         "security": [
           {
@@ -3860,6 +3860,80 @@
             "schema": {
               "type": "integer",
               "title": "Document Id"
+            }
+          },
+          {
+            "name": "count",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 40,
+              "minimum": 1,
+              "default": 40,
+              "title": "Count"
+            }
+          },
+          {
+            "name": "page_start",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Page Start"
+            }
+          },
+          {
+            "name": "page_end",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Page End"
+            }
+          },
+          {
+            "name": "chapter",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 255
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Chapter"
+            }
+          },
+          {
+            "name": "also_add_wrong_answers",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Also Add Wrong Answers"
             }
           }
         ],
@@ -5493,6 +5567,730 @@
         ]
       }
     },
+    "/syllabi/preview": {
+      "post": {
+        "tags": [
+          "syllabi"
+        ],
+        "summary": "Preview",
+        "operationId": "preview_syllabi_preview_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Preview Syllabi Preview Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/syllabi": {
+      "get": {
+        "tags": [
+          "syllabi"
+        ],
+        "summary": "List Syllabi",
+        "operationId": "list_syllabi_syllabi_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "type": "array",
+                  "title": "Response List Syllabi Syllabi Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "syllabi"
+        ],
+        "summary": "Create",
+        "operationId": "create_syllabi_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SyllabusCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Create Syllabi Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/syllabi/{syllabus_id}": {
+      "get": {
+        "tags": [
+          "syllabi"
+        ],
+        "summary": "Get",
+        "operationId": "get_syllabi__syllabus_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "syllabus_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Syllabus Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Syllabi  Syllabus Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "syllabi"
+        ],
+        "summary": "Rename",
+        "operationId": "rename_syllabi__syllabus_id__patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "syllabus_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Syllabus Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SyllabusRename"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Rename Syllabi  Syllabus Id  Patch"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "syllabi"
+        ],
+        "summary": "Delete Syllabus",
+        "operationId": "delete_syllabus_syllabi__syllabus_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "syllabus_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Syllabus Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/syllabi/{syllabus_id}/topics": {
+      "post": {
+        "tags": [
+          "syllabi"
+        ],
+        "summary": "Add Topic",
+        "operationId": "add_topic_syllabi__syllabus_id__topics_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "syllabus_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Syllabus Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TopicCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Add Topic Syllabi  Syllabus Id  Topics Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/syllabi/{syllabus_id}/topics/{topic_id}": {
+      "patch": {
+        "tags": [
+          "syllabi"
+        ],
+        "summary": "Edit Topic",
+        "operationId": "edit_topic_syllabi__syllabus_id__topics__topic_id__patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "syllabus_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Syllabus Id"
+            }
+          },
+          {
+            "name": "topic_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Topic Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TopicEdit"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Edit Topic Syllabi  Syllabus Id  Topics  Topic Id  Patch"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "syllabi"
+        ],
+        "summary": "Delete Topic",
+        "operationId": "delete_topic_syllabi__syllabus_id__topics__topic_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "syllabus_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Syllabus Id"
+            }
+          },
+          {
+            "name": "topic_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Topic Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/syllabi/{syllabus_id}/remap": {
+      "post": {
+        "tags": [
+          "syllabi"
+        ],
+        "summary": "Remap",
+        "operationId": "remap_syllabi__syllabus_id__remap_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "syllabus_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Syllabus Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Remap Syllabi  Syllabus Id  Remap Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/syllabi/{syllabus_id}/coverage": {
+      "get": {
+        "tags": [
+          "syllabi"
+        ],
+        "summary": "Get Coverage",
+        "operationId": "get_coverage_syllabi__syllabus_id__coverage_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "syllabus_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Syllabus Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Coverage Syllabi  Syllabus Id  Coverage Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/syllabi/{syllabus_id}/analytics": {
+      "get": {
+        "tags": [
+          "syllabi"
+        ],
+        "summary": "Syllabus Analytics",
+        "operationId": "syllabus_analytics_syllabi__syllabus_id__analytics_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "syllabus_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Syllabus Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Syllabus Analytics Syllabi  Syllabus Id  Analytics Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/syllabi/{syllabus_id}/topics/{topic_id}/chunks": {
+      "post": {
+        "tags": [
+          "syllabi"
+        ],
+        "summary": "Attach Pages",
+        "operationId": "attach_pages_syllabi__syllabus_id__topics__topic_id__chunks_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "syllabus_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Syllabus Id"
+            }
+          },
+          {
+            "name": "topic_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Topic Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ManualMap"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Attach Pages Syllabi  Syllabus Id  Topics  Topic Id  Chunks Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "syllabi"
+        ],
+        "summary": "Detach Pages",
+        "operationId": "detach_pages_syllabi__syllabus_id__topics__topic_id__chunks_delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "syllabus_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Syllabus Id"
+            }
+          },
+          {
+            "name": "topic_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Topic Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ManualMap"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Detach Pages Syllabi  Syllabus Id  Topics  Topic Id  Chunks Delete"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/export/{kind}/{item_id}": {
       "get": {
         "tags": [
@@ -6417,6 +7215,10 @@
             ],
             "title": "Language"
           },
+          "is_private": {
+            "type": "boolean",
+            "title": "Is Private"
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -6432,6 +7234,7 @@
           "error_message",
           "page_count",
           "language",
+          "is_private",
           "created_at"
         ],
         "title": "DocumentResponse"
@@ -6650,6 +7453,31 @@
           "refresh_token"
         ],
         "title": "LogoutRequest"
+      },
+      "ManualMap": {
+        "properties": {
+          "document_id": {
+            "type": "integer",
+            "title": "Document Id"
+          },
+          "page_start": {
+            "type": "integer",
+            "minimum": 1,
+            "title": "Page Start"
+          },
+          "page_end": {
+            "type": "integer",
+            "minimum": 1,
+            "title": "Page End"
+          }
+        },
+        "type": "object",
+        "required": [
+          "document_id",
+          "page_start",
+          "page_end"
+        ],
+        "title": "ManualMap"
       },
       "MetadataUpdate": {
         "properties": {
@@ -6947,6 +7775,20 @@
         "title": "PreprocessRequest",
         "description": "Text or an owner-scoped document page range to preprocess."
       },
+      "PreviewRequest": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "title": "PreviewRequest"
+      },
       "PublicProfileUpdate": {
         "properties": {
           "public_handle": {
@@ -7023,6 +7865,25 @@
         "type": "object",
         "title": "QuestionGenerationRequest",
         "description": "A source chunk or bounded text and an optional answer span."
+      },
+      "QuestionType": {
+        "type": "string",
+        "enum": [
+          "multiple_choice",
+          "true_false",
+          "fill_in_the_blank",
+          "short_answer"
+        ],
+        "title": "QuestionType"
+      },
+      "QuizEngine": {
+        "type": "string",
+        "enum": [
+          "auto",
+          "offline",
+          "ai"
+        ],
+        "title": "QuizEngine"
       },
       "RechunkRequest": {
         "properties": {
@@ -7426,6 +8287,58 @@
         ],
         "title": "SuspendRequest"
       },
+      "SyllabusCreate": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Title"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          },
+          "document_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title"
+        ],
+        "title": "SyllabusCreate"
+      },
+      "SyllabusRename": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Title"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title"
+        ],
+        "title": "SyllabusRename"
+      },
       "TestMetadata": {
         "properties": {
           "title": {
@@ -7501,6 +8414,120 @@
           "user"
         ],
         "title": "TokenResponse"
+      },
+      "TopicCreate": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Title"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "order": {
+            "type": "integer",
+            "title": "Order",
+            "default": 0
+          },
+          "keywords": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Keywords"
+          },
+          "sub_topics": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Sub Topics"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title"
+        ],
+        "title": "TopicCreate"
+      },
+      "TopicEdit": {
+        "properties": {
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "order": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Order"
+          },
+          "keywords": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Keywords"
+          },
+          "sub_topics": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sub Topics"
+          }
+        },
+        "type": "object",
+        "title": "TopicEdit"
       },
       "TransformerSummaryRequest": {
         "properties": {
@@ -7755,8 +8782,27 @@
             },
             "type": "array",
             "maxItems": 10,
-            "minItems": 1,
             "title": "Document Ids"
+          },
+          "syllabus_id": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Syllabus Id"
+          },
+          "topic_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "title": "Topic Ids"
           },
           "page_start": {
             "anyOf": [
@@ -7782,6 +8828,19 @@
             ],
             "title": "Page End"
           },
+          "chapter": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chapter"
+          },
           "topics": {
             "items": {
               "type": "string"
@@ -7798,18 +8857,25 @@
             "maxItems": 100,
             "title": "Chunk Ids"
           },
-          "question_count": {
+          "question_types": {
+            "items": {
+              "$ref": "#/components/schemas/QuestionType"
+            },
+            "type": "array",
+            "maxItems": 4,
+            "minItems": 1,
+            "title": "Question Types"
+          },
+          "count": {
             "type": "integer",
             "maximum": 50,
             "minimum": 1,
-            "title": "Question Count",
+            "title": "Count",
             "default": 10
           },
           "engine": {
-            "type": "string",
-            "pattern": "^(classic|llm)$",
-            "title": "Engine",
-            "default": "classic"
+            "$ref": "#/components/schemas/QuizEngine",
+            "default": "auto"
           },
           "difficulty": {
             "anyOf": [
@@ -7823,9 +8889,6 @@
           }
         },
         "type": "object",
-        "required": [
-          "document_ids"
-        ],
         "title": "GenerationRequest",
         "description": "Bounded quiz-generation request."
       }
