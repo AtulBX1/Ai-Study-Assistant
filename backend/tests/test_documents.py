@@ -14,7 +14,14 @@ from sqlalchemy import select
 
 from app.core.config import Settings, get_settings
 from app.main import app
-from app.models import Chunk, Document, DocumentPage, DocumentStatusEvent, User
+from app.models import (
+    Chunk,
+    Document,
+    DocumentPage,
+    DocumentStatusEvent,
+    Syllabus,
+    User,
+)
 from app.nlp.preprocessing import normalize_text
 from app.routers.documents import (
     get_document_embedding_service,
@@ -122,6 +129,7 @@ def _upload(
     context: DocumentTestContext,
     content: bytes | None = None,
     filename: str = "sample.pdf",
+    is_private: bool = True,
 ):
     return context.client.post(
         "/documents/upload",
@@ -133,6 +141,7 @@ def _upload(
                 "application/octet-stream",
             )
         },
+        data={"is_private": str(is_private).lower()},
     )
 
 
@@ -181,6 +190,7 @@ def test_upload_stores_pdf_safely_and_enqueues_ingestion(
     assert document["status"] == "queued"
     assert document["progress"] == 0
     assert document["title"] == "week-one notes.pdf"
+    assert document["is_private"] is True
     assert document_context.queue.jobs == [("ingest_document", (document["id"],))]
     stored_key = document_context.client.get(
         f"/documents/{document['id']}/download",
@@ -516,3 +526,31 @@ def test_document_responses_expose_privacy_in_list_and_detail(
         ]["properties"]["is_private"]["type"]
         == "boolean"
     )
+
+
+def test_upload_privacy_can_be_changed(document_context: DocumentTestContext) -> None:
+    document = _upload(document_context, is_private=False).json()
+    response = document_context.client.patch(
+        f"/documents/{document['id']}",
+        headers=document_context.headers,
+        json={"is_private": True},
+    )
+    assert response.status_code == 200
+    assert response.json()["is_private"] is True
+
+
+def test_post_index_syllabus_remapping_failure_keeps_document_ready(
+    document_context: DocumentTestContext, db_session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    document = _upload(document_context).json()
+    db_session.add(Syllabus(owner_id=document_context.owner.id, title="Course"))
+    db_session.commit()
+
+    def fail_remapping(*args, **kwargs):
+        raise RuntimeError("mapping failed")
+
+    monkeypatch.setattr("app.services.syllabus.remap_syllabus", fail_remapping)
+    _ingest(document["id"], db_session, document_context)
+    stored = db_session.get(Document, document["id"])
+    assert stored.status == "ready"
+    assert stored.error_message is None

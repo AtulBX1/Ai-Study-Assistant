@@ -17,6 +17,7 @@ from fastapi import (
     BackgroundTasks,
     Depends,
     File,
+    Form,
     HTTPException,
     Query,
     UploadFile,
@@ -71,6 +72,10 @@ class RechunkRequest(BaseModel):
         if self.overlap >= self.chunk_size:
             raise ValueError("overlap must be smaller than chunk_size.")
         return self
+
+
+class DocumentPrivacyUpdate(BaseModel):
+    is_private: bool
 
 
 def get_document_file_storage() -> FileStorage:
@@ -132,6 +137,7 @@ async def upload_document(
     job_queue: Annotated[JobQueue, Depends(get_document_job_queue)],
     file: Annotated[UploadFile, File(...)],
     settings: Annotated[Settings, Depends(get_settings)],
+    is_private: Annotated[bool, Form()] = True,
 ) -> Document:
     """Validate and store a PDF, then queue its page ingestion."""
     content = await file.read(settings.max_pdf_size_bytes + 1)
@@ -163,6 +169,7 @@ async def upload_document(
         progress=0,
         page_count=page_count,
         storage_key=storage_key,
+        is_private=is_private,
     )
     try:
         db.add(document)
@@ -480,3 +487,18 @@ def get_document(
 ) -> Document:
     """Fetch a document only when it belongs to the authenticated user."""
     return _owned_document(db, document_id, user.id)
+
+
+@router.patch("/{document_id}", response_model=DocumentResponse)
+def update_document(
+    document_id: int,
+    request: DocumentPrivacyUpdate,
+    db: DatabaseSession,
+    user: AuthenticatedUser,
+) -> Document:
+    """Update an owned document's privacy setting."""
+    document = _owned_document(db, document_id, user.id)
+    document.is_private = request.is_private
+    db.commit()
+    db.refresh(document)
+    return document

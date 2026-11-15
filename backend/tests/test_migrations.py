@@ -9,6 +9,7 @@ import app.models  # noqa: F401
 from alembic import command
 from app.core.config import get_settings
 from app.core.database import Base
+from app.main import _upgrade_local_database
 
 
 def _upgrade(path: Path, monkeypatch) -> None:
@@ -31,6 +32,24 @@ def test_full_migration_chain_creates_model_schema(tmp_path: Path, monkeypatch) 
                 column["name"] for column in inspector.get_columns(table_name)
             }
             assert {column.name for column in model_table.columns} <= actual_columns
+    finally:
+        engine.dispose()
+
+
+def test_local_startup_upgrade_migrates_an_empty_database(
+    tmp_path: Path, monkeypatch
+) -> None:
+    database = tmp_path / "startup.sqlite"
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{database.as_posix()}")
+    get_settings.cache_clear()
+    revision = _upgrade_local_database(f"sqlite:///{database.as_posix()}")
+    get_settings.cache_clear()
+    engine = create_engine(f"sqlite:///{database.as_posix()}")
+    try:
+        assert revision not in {"", "base"}
+        assert "alembic_version" in inspect(engine).get_table_names()
+        config = Config(str(Path(__file__).parents[1] / "alembic.ini"))
+        assert len(command.ScriptDirectory.from_config(config).get_heads()) == 1
     finally:
         engine.dispose()
 

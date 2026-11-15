@@ -24,12 +24,14 @@ type MockDocument = {
   error_message: string | null;
   page_count: number;
   language: string | null;
+  is_private: boolean;
   created_at: string;
 };
 
 function documentRecord(
   status: string,
   errorMessage: string | null = null,
+  isPrivate = true,
 ): MockDocument {
   return {
     id: 71,
@@ -39,6 +41,7 @@ function documentRecord(
     error_message: errorMessage,
     page_count: 2,
     language: "en",
+    is_private: isPrivate,
     created_at: "2026-01-01T00:00:00Z",
   };
 }
@@ -91,7 +94,8 @@ async function mockLibrary(page: Page, initial: MockDocument[]) {
     (url) => url.pathname === "/documents/upload",
     async (route: Route) => {
       if (route.request().method() !== "POST") return route.fallback();
-      documents = [documentRecord("queued"), ...documents];
+      const isPrivate = route.request().postData()?.includes("\r\n\r\ntrue\r\n") ?? true;
+      documents = [documentRecord("queued", null, isPrivate), ...documents];
       await route.fulfill({
         status: 201,
         contentType: "application/json",

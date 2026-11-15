@@ -11,6 +11,9 @@ export class ApiError extends Error {
 }
 
 function getFriendlyMessage(status: number, detail: unknown): string {
+  if (status >= 500 && typeof detail === "object" && detail !== null && "request_id" in detail && typeof detail.request_id === "string") {
+    return `Server error (id ${detail.request_id})`;
+  }
   if (typeof detail === "string" && detail.trim()) return detail;
 
   if (typeof detail === "object" && detail !== null && "detail" in detail) {

@@ -9,18 +9,18 @@ export function groundingLevel(score: number): GroundingLevel {
   if (score >= 0.75) {
     return {
       label: "Well supported",
-      className: "border-emerald-600/40 bg-emerald-600/10 text-emerald-800 dark:text-emerald-200",
+      className: "border-emerald-700 bg-emerald-100 text-emerald-950 dark:border-emerald-300 dark:bg-emerald-950 dark:text-emerald-100",
     };
   }
   if (score >= 0.5) {
     return {
       label: "Partly supported",
-      className: "border-amber-600/40 bg-amber-600/10 text-amber-800 dark:text-amber-200",
+      className: "border-amber-700 bg-amber-100 text-amber-950 dark:border-amber-300 dark:bg-amber-950 dark:text-amber-100",
     };
   }
   return {
     label: "Weakly supported",
-    className: "border-red-600/40 bg-red-600/10 text-red-800 dark:text-red-200",
+    className: "border-red-700 bg-red-100 text-red-950 dark:border-red-300 dark:bg-red-950 dark:text-red-100",
   };
 }
 

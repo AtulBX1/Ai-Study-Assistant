@@ -1,8 +1,10 @@
 """FastAPI application entry point."""
 
 import logging
+import sys
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -35,10 +37,41 @@ configure_logging(settings.backend_log_level)
 logger = logging.getLogger(__name__)
 
 
+def _upgrade_local_database(database_url: str) -> str:
+    """Apply all local migrations and return the resulting revision."""
+    from alembic.config import Config
+    from sqlalchemy import create_engine, text
+    from sqlalchemy.engine import make_url
+
+    from alembic import command
+
+    config = Config(str(Path(__file__).resolve().parents[1] / "alembic.ini"))
+    parsed_url = make_url(database_url)
+    if parsed_url.drivername.startswith("sqlite"):
+        database_path = parsed_url.database
+        if database_path and database_path != ":memory:":
+            Path(database_path).parent.mkdir(parents=True, exist_ok=True)
+    command.upgrade(config, "head")
+    engine = create_engine(database_url)
+    try:
+        with engine.connect() as connection:
+            revisions = (
+                connection.execute(text("SELECT version_num FROM alembic_version"))
+                .scalars()
+                .all()
+            )
+        return ",".join(revisions) or "base"
+    finally:
+        engine.dispose()
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
-    """Log application startup and shutdown."""
+    """Migrate local databases on application startup, then warm models."""
     logger.info("Backend application starting")
+    if settings.backend == "local" and "pytest" not in sys.modules:
+        revision = _upgrade_local_database(settings.database_url)
+        logger.info("Local database migrated to revision %s", revision)
     start_model_warmup()
     yield
     logger.info("Backend application stopping")

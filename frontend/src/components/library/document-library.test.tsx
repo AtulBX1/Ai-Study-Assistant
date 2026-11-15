@@ -39,6 +39,7 @@ const document: DocumentRecord = {
   error_message: "Text extraction failed.",
   page_count: 3,
   language: null,
+  is_private: true,
   created_at: "2026-01-01T00:00:00Z",
 };
 

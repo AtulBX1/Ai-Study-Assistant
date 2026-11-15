@@ -1,5 +1,6 @@
 """PDF validation and page-oriented ingestion."""
 
+import logging
 from io import BytesIO
 from statistics import median
 from typing import Any
@@ -18,6 +19,8 @@ from app.services.embeddings import EmbeddingService
 from app.services.file_storage import FileStorage
 from app.services.vector_indexing import index_document_chunks
 from app.services.vector_store import VectorStore, get_vector_store
+
+logger = logging.getLogger(__name__)
 
 
 class InvalidPDFError(ValueError):
@@ -181,7 +184,7 @@ def ingest_document(
                     ]
                     text = page_data["text"]
                     ocr_status = "not_needed"
-                    if len("".join(text.split())) < 40:
+                    if not text:
                         try:
                             ocr_text = _ocr_page(pdf[index - 1])
                             if ocr_text:
@@ -191,7 +194,7 @@ def ingest_document(
                                 ocr_status = "completed"
                             else:
                                 ocr_status = "no_text_found"
-                        except pytesseract.TesseractNotFoundError:
+                        except (pytesseract.TesseractNotFoundError, OSError):
                             ocr_status = "ocr_unavailable"
 
                     table_text = _render_table_text(tables)
@@ -229,23 +232,29 @@ def ingest_document(
         )
         db.commit()
         _record_state(db, document, "ready", 100)
-        from app.core.config import get_settings
-        from app.models import Syllabus
-        from app.services.embeddings import get_embedding_service
-        from app.services.syllabus import remap_syllabus
+        try:
+            from app.core.config import get_settings
+            from app.models import Syllabus
+            from app.services.embeddings import get_embedding_service
+            from app.services.syllabus import remap_syllabus
 
-        mapper = get_embedding_service()
-        for syllabus in db.scalars(
-            select(Syllabus).where(Syllabus.owner_id == document.owner_id)
-        ):
-            remap_syllabus(
-                db,
-                syllabus,
-                document.owner_id,
-                mapper,
-                get_settings().syllabus_mapping_threshold,
+            mapper = get_embedding_service()
+            for syllabus in db.scalars(
+                select(Syllabus).where(Syllabus.owner_id == document.owner_id)
+            ):
+                remap_syllabus(
+                    db,
+                    syllabus,
+                    document.owner_id,
+                    mapper,
+                    get_settings().syllabus_mapping_threshold,
+                )
+            db.commit()
+        except Exception:
+            db.rollback()
+            logger.exception(
+                "Post-index document processing failed for %s", document_id
             )
-        db.commit()
     except Exception as error:
         db.rollback()
         failed_document = db.scalar(select(Document).where(Document.id == document_id))

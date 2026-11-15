@@ -17,10 +17,12 @@ class FakeXMLHttpRequest {
     error_message: null,
     page_count: 1,
     language: null,
+    is_private: true,
     created_at: "2026-01-01T00:00:00Z",
   });
   headers = new Map<string, string>();
   sent = false;
+  formData: FormData | null = null;
   aborted = false;
   onload: (() => void) | null = null;
   onloadend: (() => void) | null = null;
@@ -33,8 +35,9 @@ class FakeXMLHttpRequest {
     this.headers.set(name, value);
   }
 
-  send(): void {
+  send(body?: Document | XMLHttpRequestBodyInit | null): void {
     this.sent = true;
+    this.formData = body instanceof FormData ? body : null;
     const upload = this.upload as unknown as {
       onprogress: ((event: ProgressEvent) => void) | null;
     };
@@ -98,6 +101,7 @@ describe("PDF upload validation and transport", () => {
 
     expect(xhr.sent).toBe(true);
     expect(xhr.headers.get("Accept")).toBe("application/json");
+    expect(xhr.formData?.get("is_private")).toBe("true");
     expect(onProgress).toHaveBeenCalledWith(25);
     xhr.finish();
     await expect(request).resolves.toMatchObject({ id: 1, status: "queued" });

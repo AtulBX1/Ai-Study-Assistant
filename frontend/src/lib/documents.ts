@@ -2,9 +2,7 @@ import { apiClient, unwrapApiResult } from "@/lib/api";
 import type { components } from "@/lib/api/schema";
 import { normalizeApiError } from "@/lib/errors";
 
-export type DocumentRecord = Omit<components["schemas"]["DocumentResponse"], "is_private"> & {
-  is_private?: boolean;
-};
+export type DocumentRecord = components["schemas"]["DocumentResponse"];
 
 export type DocumentPageRecord = components["schemas"]["DocumentPageResponse"];
 export type DocumentStatusEvent = {
@@ -37,6 +35,17 @@ export async function getDocument(id: number): Promise<DocumentRecord> {
     params: { path: { document_id: id } },
   });
   return unwrapApiResult(result);
+}
+
+export async function updateDocumentPrivacy(id: number, isPrivate: boolean): Promise<DocumentRecord> {
+  const response = await authorizedDocumentFetch(`/documents/${id}`, undefined, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ is_private: isPrivate }),
+  });
+  const body: unknown = await response.json();
+  if (!response.ok) throw normalizeApiError(response.status, body);
+  return body as DocumentRecord;
 }
 
 export async function getDocumentStatus(id: number): Promise<DocumentRecord> {
@@ -168,6 +177,7 @@ export async function getDocumentPageImage(
 async function authorizedDocumentFetch(
   path: string,
   signal?: AbortSignal,
+  init: RequestInit = {},
 ): Promise<Response> {
   const { apiBaseUrl } = await import("@/lib/api");
   const { getAccessToken, refreshSession } = await import("@/lib/session");
@@ -175,7 +185,7 @@ async function authorizedDocumentFetch(
     const headers = new Headers();
     const token = getAccessToken();
     if (token) headers.set("Authorization", `Bearer ${token}`);
-    return fetch(`${apiBaseUrl}${path}`, { headers, signal });
+    return fetch(`${apiBaseUrl}${path}`, { ...init, headers: new Headers({ ...Object.fromEntries(headers), ...Object.fromEntries(new Headers(init.headers)) }), signal });
   };
   let response = await request();
   if (response.status === 401 && (await refreshSession())) {

@@ -1,5 +1,6 @@
 import { AlertCircle } from "lucide-react";
 import type { ReactNode } from "react";
+import { Button } from "@/components/ui/button";
 
 export function ErrorState({
   title = "Something went wrong",
@@ -19,7 +20,12 @@ export function ErrorState({
       <div>
         <h2 className="font-medium">{title}</h2>
         <p className="mt-1 text-sm leading-5">{description}</p>
-        {action ? <div className="mt-3">{action}</div> : null}
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          {action}
+          <Button type="button" size="sm" variant="outline" onClick={() => window.location.reload()}>
+            Retry
+          </Button>
+        </div>
       </div>
     </div>
   );

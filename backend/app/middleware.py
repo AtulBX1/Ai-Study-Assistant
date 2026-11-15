@@ -1,5 +1,6 @@
 """HTTP middleware for request correlation."""
 
+import logging
 import uuid
 
 from redis.exceptions import RedisError
@@ -10,6 +11,8 @@ from app.core.cache import Cache
 from app.core.config import Settings, get_settings
 from app.core.security import access_token_subject
 from app.logging_config import request_id_context
+
+logger = logging.getLogger(__name__)
 
 
 class RequestIdMiddleware:
@@ -38,7 +41,18 @@ class RequestIdMiddleware:
             await send(message)
 
         try:
-            await self.app(scope, receive, send_with_request_id)
+            try:
+                await self.app(scope, receive, send_with_request_id)
+            except Exception:
+                logger.exception("Unhandled request error")
+                response = JSONResponse(
+                    status_code=500,
+                    content={
+                        "detail": "Internal server error.",
+                        "request_id": request_id,
+                    },
+                )
+                await response(scope, receive, send_with_request_id)
         finally:
             request_id_context.reset(token)
 

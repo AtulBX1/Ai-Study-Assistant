@@ -46,6 +46,7 @@ import {
   downloadDocument,
   listDocuments,
   reindexDocument,
+  updateDocumentPrivacy,
   type DocumentRecord,
 } from "@/lib/documents";
 import {
@@ -283,20 +284,6 @@ function UploadQueue({
   };
 
   const uploadOne = async (candidate: Candidate) => {
-    if (candidate.isPrivate) {
-      setCandidates((current) =>
-        current.map((item) =>
-          item.id === candidate.id
-            ? {
-                ...item,
-                error:
-                  "The current API cannot save a private flag. Uncheck Private only if you accept this document being treated as non-private.",
-              }
-            : item,
-        ),
-      );
-      return;
-    }
     const controller = new AbortController();
     controllers.current.set(candidate.id, controller);
     setTasks((current) => [
@@ -317,6 +304,7 @@ function UploadQueue({
       }
       const document = await uploadPdf(candidate.file, {
         signal: controller.signal,
+        isPrivate: candidate.isPrivate,
         onProgress: (progress) =>
           setTasks((current) =>
             current.map((task) =>
@@ -405,11 +393,6 @@ function UploadQueue({
                       Why?
                     </span>
                   </label>
-                  <p className="mt-1 text-xs text-danger" role="status">
-                    {candidate.isPrivate
-                      ? "Private upload is unavailable: the current upload API has no privacy field. The file will not be sent while this is checked."
-                      : "The backend does not currently store a privacy flag; this upload will be non-private."}
-                  </p>
                   {candidate.error ? (
                     <p className="mt-1 text-xs text-danger" role="alert">
                       {candidate.error}
@@ -420,7 +403,6 @@ function UploadQueue({
                   <Button
                     type="button"
                     size="sm"
-                    disabled={candidate.isPrivate}
                     onClick={() => void uploadOne(candidate)}
                   >
                     Upload PDF
@@ -503,6 +485,7 @@ function DocumentCard({
 }) {
   const [reindexing, setReindexing] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const queryClient = useQueryClient();
 
   const handleReindex = async () => {
     setReindexing(true);
@@ -596,9 +579,9 @@ function DocumentCard({
               <RefreshCw size={16} aria-hidden="true" />
               {reindexing ? "Reindexing…" : "Reindex"}
             </Button>
-            <p className="px-3 py-2 text-xs text-muted-foreground">
-              Privacy cannot be changed because the API does not support it yet.
-            </p>
+            <Button type="button" variant="ghost" className="justify-start" onClick={async () => { try { await updateDocumentPrivacy(document.id, !document.is_private); await queryClient.invalidateQueries({ queryKey: ["documents"] }); toast.success("Privacy setting updated."); } catch (error) { toast.error(error instanceof Error ? error.message : "Privacy update failed."); } }}>
+              {document.is_private ? "Make public" : "Make private"}
+            </Button>
             <Button
               type="button"
               variant="ghost"

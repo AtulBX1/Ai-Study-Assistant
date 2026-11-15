@@ -26,6 +26,30 @@ def test_request_id_is_propagated() -> None:
     assert response.headers["x-request-id"] == "test-request-123"
 
 
+def test_unhandled_error_is_json_with_request_id_and_cors() -> None:
+    def explode() -> None:
+        raise RuntimeError("private implementation detail")
+
+    app.add_api_route("/__test_server_error", explode, methods=["GET"])
+    try:
+        response = client.get(
+            "/__test_server_error",
+            headers={"Origin": "http://localhost:3000", "x-request-id": "error-123"},
+        )
+    finally:
+        app.router.routes[:] = [
+            route
+            for route in app.router.routes
+            if getattr(route, "path", None) != "/__test_server_error"
+        ]
+    assert response.status_code == 500
+    assert response.json() == {
+        "detail": "Internal server error.",
+        "request_id": "error-123",
+    }
+    assert response.headers["access-control-allow-origin"] == "http://localhost:3000"
+
+
 @pytest.mark.parametrize(
     "origin",
     ["http://localhost:3000", "http://127.0.0.1:3000"],

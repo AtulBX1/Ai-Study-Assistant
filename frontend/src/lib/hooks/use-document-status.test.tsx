@@ -21,6 +21,7 @@ const initial: DocumentRecord = {
   error_message: null,
   page_count: 1,
   language: null,
+  is_private: true,
   created_at: "2026-01-01T00:00:00Z",
 };
 

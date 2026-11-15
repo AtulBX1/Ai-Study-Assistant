@@ -34,6 +34,7 @@ import {
   getDocumentKeyTerms,
   getDocumentPage,
   reindexDocument,
+  updateDocumentPrivacy,
   type DocumentRecord,
 } from "@/lib/documents";
 import { useDocumentStatus } from "@/lib/hooks/use-document-status";
@@ -41,15 +42,7 @@ import { useDocumentStatus } from "@/lib/hooks/use-document-status";
 const terminal = new Set(["ready", "failed"]);
 
 function PrivateFlag({ document }: { document: DocumentRecord }) {
-  return (
-    <Badge title="The current API does not include document privacy in its response.">
-      {document.is_private === undefined
-        ? "Privacy unavailable"
-        : document.is_private
-          ? "Private"
-          : "Not private"}
-    </Badge>
-  );
+  return <Badge>{document.is_private ? "Private" : "Not private"}</Badge>;
 }
 
 function DocumentOverview({ id }: { id: number }) {
@@ -146,6 +139,7 @@ function DocumentPages({ document }: { document: DocumentRecord }) {
             <Card key={page.page_number}>
               <CardContent className="p-4">
                 <h3 className="font-medium">Page {page.page_number}</h3>
+                {page.ocr_status === "ocr_unavailable" ? <p role="status" className="mt-2 rounded border border-amber-700 bg-amber-100 p-2 text-sm text-amber-950 dark:border-amber-300 dark:bg-amber-950 dark:text-amber-100">This scanned page needs OCR. Install Tesseract and reindex the document to extract its text.</p> : null}
                 <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">
                   {page.text.trim()
                     ? `${page.text.slice(0, 1000)}${page.text.length > 1000 ? "…" : ""}`
@@ -176,6 +170,7 @@ function DocumentActions({
   onDelete: () => void;
 }) {
   const [working, setWorking] = useState(false);
+  const queryClient = useQueryClient();
 
   const download = async () => {
     setWorking(true);
@@ -231,6 +226,9 @@ function DocumentActions({
         ))}
       </div>
       <div className="flex flex-wrap gap-2 border-t border-border pt-5">
+        <Button type="button" variant="outline" disabled={working} onClick={async () => { setWorking(true); try { await updateDocumentPrivacy(document.id, !document.is_private); await queryClient.invalidateQueries({ queryKey: ["document", document.id] }); toast.success("Privacy setting updated."); } catch (error) { toast.error(error instanceof Error ? error.message : "Privacy update failed."); } finally { setWorking(false); } }}>
+          Make {document.is_private ? "not private" : "private"}
+        </Button>
         <Button type="button" variant="outline" onClick={() => void download()} disabled={working}>
           <ArrowDownToLine size={16} aria-hidden="true" />
           Download original
@@ -249,10 +247,6 @@ function DocumentActions({
           Delete document
         </Button>
       </div>
-      <p className="text-sm text-muted-foreground">
-        Privacy cannot be changed because the current API does not accept or return
-        document privacy flags.
-      </p>
     </div>
   );
 }

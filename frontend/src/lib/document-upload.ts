@@ -56,6 +56,7 @@ export async function estimatePdfPageCount(file: File): Promise<number | null> {
 export type UploadRequestOptions = {
   signal: AbortSignal;
   onProgress: (progress: number) => void;
+  isPrivate?: boolean;
   xhrFactory?: () => XMLHttpRequest;
 };
 
@@ -68,6 +69,7 @@ function sendUpload(
     const xhr = options.xhrFactory?.() ?? new XMLHttpRequest();
     const formData = new FormData();
     formData.append("file", file, file.name);
+    formData.append("is_private", String(options.isPrivate ?? true));
     xhr.open("POST", `${apiBaseUrl}/documents/upload`);
     xhr.setRequestHeader("Accept", "application/json");
     if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
@@ -117,7 +119,8 @@ function isDocumentRecord(value: unknown): value is DocumentRecord {
     "language" in value &&
     (typeof value.language === "string" || value.language === null) &&
     "created_at" in value &&
-    typeof value.created_at === "string"
+    typeof value.created_at === "string" &&
+    "is_private" in value && typeof value.is_private === "boolean"
   );
 }
 

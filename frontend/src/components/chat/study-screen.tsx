@@ -132,15 +132,7 @@ function providerLabel(provider: string): string {
 }
 
 function PrivateBadge({ document }: { document: DocumentRecord }) {
-  return document.is_private ? (
-    <Badge className="border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-200">
-      Private
-    </Badge>
-  ) : (
-    <Badge title="The current document API does not expose a privacy field.">
-      Privacy unavailable
-    </Badge>
-  );
+  return <Badge className={document.is_private ? "border-amber-700/50 bg-amber-100 text-amber-950 dark:border-amber-300/50 dark:bg-amber-950 dark:text-amber-100" : "border-emerald-700/50 bg-emerald-100 text-emerald-950 dark:border-emerald-300/50 dark:bg-emerald-950 dark:text-emerald-100"}>{document.is_private ? "Private" : "Not private"}</Badge>;
 }
 
 export function DocumentPicker() {
@@ -854,7 +846,7 @@ export function StudyScreen({ documentId }: { documentId: number }) {
                   message.role === "user"
                     ? "ml-auto bg-primary text-primary-foreground"
                     : isNotFoundRefusal(message.content)
-                      ? "mr-auto border border-amber-600/50 bg-amber-500/10"
+                      ? "mr-auto border border-amber-700/50 bg-amber-100 text-amber-950 dark:border-amber-300/50 dark:bg-amber-950 dark:text-amber-100"
                       : "mr-auto border border-border bg-background"
                 }`}
               >
