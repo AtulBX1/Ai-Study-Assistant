@@ -86,7 +86,7 @@ export async function getFlashcardDeckStats(
 export async function generateFlashcards(
   documentId: number,
   options: { count?: number; page_start?: number; page_end?: number; chapter?: string } = {},
-): Promise<{ created: number; requested: number; createdBySource: Record<string, number>; shortfallReasons: Record<string, number> }> {
+): Promise<{ created: number; requested: number; createdBySource: Record<string, number>; shortfallReasons: Record<string, number>; pipelineStages: Record<string, string> }> {
   const result = await apiClient.POST(
     "/study/documents/{document_id}/flashcards/generate",
     { params: { path: { document_id: documentId }, query: options } },
@@ -97,7 +97,8 @@ export async function generateFlashcards(
   }
   const bySource = isRecord(data.created_by_source) ? data.created_by_source : {};
   const reasons = isRecord(data.shortfall_reasons) ? data.shortfall_reasons : {};
-  return { created: data.created, requested: typeof data.requested === "number" ? data.requested : options.count ?? 40, createdBySource: Object.fromEntries(Object.entries(bySource).filter((entry): entry is [string, number] => typeof entry[1] === "number")), shortfallReasons: Object.fromEntries(Object.entries(reasons).filter((entry): entry is [string, number] => typeof entry[1] === "number")) };
+  const stages = isRecord(data.pipeline_stages) ? data.pipeline_stages : {};
+  return { created: data.created, requested: typeof data.requested === "number" ? data.requested : options.count ?? 40, createdBySource: Object.fromEntries(Object.entries(bySource).filter((entry): entry is [string, number] => typeof entry[1] === "number")), shortfallReasons: Object.fromEntries(Object.entries(reasons).filter((entry): entry is [string, number] => typeof entry[1] === "number")), pipelineStages: Object.fromEntries(Object.entries(stages).filter((entry): entry is [string, string] => typeof entry[1] === "string")) };
 }
 
 export async function reviewFlashcard(

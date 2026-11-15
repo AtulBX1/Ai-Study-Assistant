@@ -127,8 +127,32 @@ def upgrade() -> None:
             )
     _create_index("ix_questions_syllabus_topic_id", "questions", ["syllabus_topic_id"])
 
+    user_columns = (
+        set()
+        if context.is_offline_mode()
+        else {item["name"] for item in sa.inspect(op.get_bind()).get_columns("users")}
+    )
+    if "local_models_only" not in user_columns:
+        with op.batch_alter_table("users", schema=None) as batch_op:
+            batch_op.add_column(
+                sa.Column(
+                    "local_models_only",
+                    sa.Boolean(),
+                    nullable=False,
+                    server_default=sa.false(),
+                )
+            )
+
 
 def downgrade() -> None:
+    user_columns = (
+        set()
+        if context.is_offline_mode()
+        else {item["name"] for item in sa.inspect(op.get_bind()).get_columns("users")}
+    )
+    if "local_models_only" in user_columns:
+        with op.batch_alter_table("users", schema=None) as batch_op:
+            batch_op.drop_column("local_models_only")
     op.drop_index("ix_questions_syllabus_topic_id", table_name="questions")
     with op.batch_alter_table("questions", schema=None) as batch_op:
         batch_op.drop_constraint(

@@ -90,6 +90,7 @@ class GeminiProvider:
         self.initial_backoff = initial_backoff
         self.name = "gemini"
         self.is_external = True
+        self.cooldown_until: datetime | None = None
         self.last_token_count: int = 0
         self.last_latency_ms: float = 0.0
 
@@ -192,6 +193,9 @@ class GeminiProvider:
                 # Scrub any potential leak of the api key in exc message
                 safe_msg = redact_secrets(str(exc), [api_key])
                 if isinstance(exc, RateLimitError):
+                    self.cooldown_until = datetime.now(UTC) + timedelta(
+                        seconds=max(1, exc.retry_after_seconds or 60)
+                    )
                     raise RateLimitError(
                         safe_msg,
                         retry_after_seconds=getattr(exc, "retry_after_seconds", None),
@@ -478,6 +482,7 @@ class ProviderChain:
         self.name, self.is_external = "chain", False
         self.last_token_count, self.last_latency_ms = 0, 0.0
         self.last_provider = ""
+        self.last_model = ""
         self.skipped: list[dict[str, str]] = []
         self.history: list[dict[str, str]] = []
         self.request_count = 0
@@ -560,6 +565,7 @@ class ProviderChain:
                 # Buffer each attempt so a failed stream can safely fall through.
                 output = list(provider.stream(prompt, system_prompt))
                 self.last_provider = provider.name
+                self.last_model = getattr(provider, "model_name", "") or ""
                 self.last_token_count = getattr(provider, "last_token_count", 0)
                 yield from output
                 return
@@ -657,6 +663,7 @@ class ProviderChain:
                         0, provider.request_count - provider_request_count - 1
                     )
                 self.last_provider = provider.name
+                self.last_model = getattr(provider, "model_name", "") or ""
                 self.last_diagnostics = dict(getattr(provider, "last_diagnostics", {}))
                 self.response_counts[provider.name] = (
                     self.response_counts.get(provider.name, 0) + 1

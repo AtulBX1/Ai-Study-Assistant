@@ -117,7 +117,14 @@ def tree(db: Session, syllabus: Syllabus) -> list[dict[str, Any]]:
 @router.post("/preview")
 def preview(request: PreviewRequest, user: AuthenticatedUser) -> dict:
     del user
-    return {"tree": parse_syllabus(request.text)}
+    return {
+        "tree": parse_syllabus(request.text),
+        "pipeline_stages": {
+            "retrieval": "provided syllabus text",
+            "generation": "local syllabus parser",
+            "validation": "local topic hierarchy checks",
+        },
+    }
 
 
 @router.post("")
@@ -150,7 +157,20 @@ def create(
     save_tree(db, syllabus, parse_syllabus(text or ""))
     remap_now(db, syllabus)
     db.commit()
-    return {"id": syllabus.id, "title": syllabus.title, "tree": tree(db, syllabus)}
+    return {
+        "id": syllabus.id,
+        "title": syllabus.title,
+        "tree": tree(db, syllabus),
+        "pipeline_stages": {
+            "retrieval": (
+                "local document pages"
+                if request.document_id
+                else "provided syllabus text"
+            ),
+            "generation": "local syllabus parser",
+            "validation": "local topic hierarchy checks",
+        },
+    }
 
 
 @router.get("")

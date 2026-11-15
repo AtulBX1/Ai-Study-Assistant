@@ -1,5 +1,6 @@
 """Chat session management, streaming RAG queries, and feedback endpoints."""
 
+from copy import copy
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -191,6 +192,19 @@ def post_message(
 ) -> StreamingResponse:
     """Post user question and stream the assistant's response via Server-Sent Events."""
     chat_session = _get_owned_session(db, session_id, user.id)
+    from app.core.config import get_settings
+    from app.services.feature_ai import feature_provider, feature_resources
+
+    routed_pipeline = copy(pipeline)
+    if (
+        user.local_models_only
+        or get_settings().feature_chat_provider
+        or pipeline is pipeline_instance
+    ):
+        routed_pipeline.provider = feature_provider(
+            "chat", local_only=user.local_models_only
+        )
+    routed_pipeline.cache, routed_pipeline.rate_limiter = feature_resources("chat")
 
     # Automatically set session title if this is the first message
     if chat_session.title == "New chat":
@@ -207,7 +221,7 @@ def post_message(
     db.commit()
 
     # Stream the grounded response
-    generator = pipeline.stream_chat(
+    generator = routed_pipeline.stream_chat(
         db=db,
         user_id=user.id,
         session_id=chat_session.id,

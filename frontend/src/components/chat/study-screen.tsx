@@ -60,6 +60,7 @@ type ChatMessage = {
   role: "user" | "assistant";
   content: string;
   provider?: string;
+  pipelineStages?: Record<string, string>;
   stopped?: boolean;
   groundingScore?: number | null;
   unsupportedSentences?: string[];
@@ -352,6 +353,7 @@ export function StudyScreen({ documentId }: { documentId: number }) {
             ? { messageId: completion.message_id }
             : {}),
           ...(completion.provider ? { provider: completion.provider } : {}),
+          ...(completion.pipeline_stages ? { pipelineStages: completion.pipeline_stages } : {}),
           ...(completion.grounding_score !== undefined
             ? { groundingScore: completion.grounding_score }
             : {}),
@@ -895,6 +897,12 @@ export function StudyScreen({ documentId }: { documentId: number }) {
                   <p className="mt-3 border-t border-border/70 pt-2 text-xs text-muted-foreground">
                     Response stopped.
                   </p>
+                ) : null}
+                {message.pipelineStages ? (
+                  <details className="mt-2 text-xs text-muted-foreground">
+                    <summary className="cursor-pointer">Under the hood</summary>
+                    <ul className="mt-1 space-y-1">{Object.entries(message.pipelineStages).map(([stage, detail]) => <li key={stage}><span className="capitalize">{stage}:</span> {detail}</li>)}</ul>
+                  </details>
                 ) : null}
                 {message.role === "assistant" ? (
                   <>

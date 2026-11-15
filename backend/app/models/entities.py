@@ -69,6 +69,7 @@ class User(TimestampMixin, Base):
         String(20), default=_default_public_handle
     )
     show_on_leaderboards: Mapped[bool] = mapped_column(Boolean, default=True)
+    local_models_only: Mapped[bool] = mapped_column(Boolean, default=False)
     public_handle_changed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True)
     )

@@ -364,10 +364,17 @@ def generate_flashcards(
         )
     provider = None
     if not document.is_private:
+        from app.core.config import get_settings
         from app.routers.quizzes import _provider
+        from app.services.feature_ai import feature_provider
 
         try:
-            provider = _provider()
+            if user.local_models_only:
+                provider = feature_provider("flashcards", local_only=True)
+            elif get_settings().feature_flashcards_provider:
+                provider = feature_provider("flashcards")
+            else:
+                provider = _provider()
         except ProviderUnavailableError:
             provider = None
     created, report = generate_document_flashcards(
@@ -387,6 +394,12 @@ def generate_flashcards(
         "created": len(created),
         **report,
         "cards": [_card_payload(card, document.title) for card in created],
+        "pipeline_stages": {
+            "retrieval": "local document pages + glossary",
+            "generation": getattr(provider, "last_provider", "")
+            or getattr(provider, "name", "classic rules"),
+            "validation": "local evidence + answer validation",
+        },
     }
 
 
@@ -743,6 +756,11 @@ class SummaryRequest(BaseModel):
 
 
 def _summary_payload(summary: DocumentSummary) -> dict[str, Any]:
+    metadata = (
+        summary.generation_metadata
+        if isinstance(summary.generation_metadata, dict)
+        else {}
+    )
     return {
         "id": summary.id,
         "document_id": summary.document_id,
@@ -755,6 +773,14 @@ def _summary_payload(summary: DocumentSummary) -> dict[str, Any]:
         "page_end": summary.page_end,
         "content": summary.content,
         "items": summary.items,
+        "pipeline_stages": metadata.get(
+            "pipeline_stages",
+            {
+                "retrieval": "local document pages",
+                "generation": summary.engine_used,
+                "validation": "local grounding and evidence checks",
+            },
+        ),
         "created_at": summary.created_at,
         "updated_at": summary.updated_at,
     }
@@ -829,12 +855,19 @@ def create_summary(
             document.id,
             user.id,
             request.summary_type,
-            request.engine,
+            "t5" if user.local_models_only else request.engine,
             request.page_start,
             request.page_end,
         )
         return {"job_id": job_id, "status": "queued"}
 
+    from app.services.feature_ai import feature_provider
+
+    summary_provider = (
+        feature_provider("summary", local_only=user.local_models_only)
+        if request.engine == "llm"
+        else None
+    )
     summary = generate_document_summary(
         db,
         document=document,
@@ -842,6 +875,7 @@ def create_summary(
         engine=request.engine,
         page_start=request.page_start,
         page_end=request.page_end,
+        provider=summary_provider,
     )
     db.commit()
     db.refresh(summary)

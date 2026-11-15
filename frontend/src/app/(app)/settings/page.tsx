@@ -11,6 +11,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { ProfileSettings } from "@/components/settings/profile-settings";
 import { useMe } from "@/lib/hooks/use-me";
 import { logoutUser } from "@/lib/auth";
+import { AIServices } from "@/components/settings/ai-services";
 
 export default function SettingsPage() {
   const { data: user } = useMe();
@@ -76,6 +77,9 @@ export default function SettingsPage() {
             </div>
           </CardContent>
         </Card>
+        <div className="lg:col-span-2">
+          <AIServices initialLocalOnly={user?.local_models_only ?? false} />
+        </div>
         <div className="lg:col-span-2">
           <ProfileSettings />
         </div>

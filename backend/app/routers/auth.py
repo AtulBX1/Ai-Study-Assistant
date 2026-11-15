@@ -16,6 +16,7 @@ from app.dependencies.auth import get_current_user
 from app.models import RefreshToken, User
 from app.models.entities import utc_now
 from app.schemas.auth import (
+    AISettingsUpdate,
     LoginRequest,
     LogoutRequest,
     PublicProfileUpdate,
@@ -39,6 +40,7 @@ def user_response(user: User) -> UserResponse:
         role=user.role,
         public_handle=user.public_handle,
         show_on_leaderboards=user.show_on_leaderboards,
+        local_models_only=user.local_models_only,
     )
 
 
@@ -115,6 +117,7 @@ def get_public_profile(user: AuthenticatedUser) -> dict[str, object]:
     return {
         "public_handle": user.public_handle,
         "show_on_leaderboards": user.show_on_leaderboards,
+        "local_models_only": user.local_models_only,
     }
 
 
@@ -149,6 +152,15 @@ def update_public_profile(
         "public_handle": user.public_handle,
         "show_on_leaderboards": user.show_on_leaderboards,
     }
+
+
+@router.patch("/ai-settings")
+def update_ai_settings(
+    payload: AISettingsUpdate, db: DatabaseSession, user: AuthenticatedUser
+) -> dict[str, bool]:
+    user.local_models_only = payload.local_models_only
+    db.commit()
+    return {"local_models_only": user.local_models_only}
 
 
 @router.post("/login", response_model=TokenResponse)

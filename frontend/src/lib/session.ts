@@ -7,6 +7,7 @@ export interface User {
   role: string;
   public_handle: string;
   show_on_leaderboards: boolean;
+  local_models_only?: boolean;
 }
 
 export interface SessionPayload {

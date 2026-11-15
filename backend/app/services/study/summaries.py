@@ -1015,6 +1015,13 @@ def generate_document_summary(
         " | ".join(dict.fromkeys(fallback_reasons)) if fallback_reasons else None
     )
 
+    provider_name = getattr(provider, "last_provider", "") or getattr(
+        provider, "name", "local"
+    )
+    provider_model = getattr(provider, "last_model", "") or getattr(
+        provider, "model_name", ""
+    )
+    generation_label = f"{provider_name}/{provider_model}".rstrip("/")
     summary_record = DocumentSummary(
         document_id=document.id,
         owner_id=document.owner_id,
@@ -1032,6 +1039,15 @@ def generate_document_summary(
             "fallback_reasons": fallback_reasons,
             "requested_page_start": page_start,
             "requested_page_end": page_end,
+            "pipeline_stages": {
+                "retrieval": "local document pages",
+                "generation": (
+                    generation_label
+                    if engine == "llm" and provider is not None
+                    else overall_engine_used
+                ),
+                "validation": "local grounding and evidence checks",
+            },
         },
     )
     db.add(summary_record)

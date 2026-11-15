@@ -582,6 +582,12 @@ class RAGChatPipeline:
         db.commit()
         db.refresh(bot_msg)
 
+        generation_provider = getattr(active_provider, "last_provider", "") or getattr(
+            active_provider, "name", "local"
+        )
+        generation_model = getattr(active_provider, "last_model", "") or getattr(
+            active_provider, "model_name", ""
+        )
         final_payload = {
             "done": True,
             "provider": provider_label,
@@ -591,6 +597,11 @@ class RAGChatPipeline:
             "explanation": explanation,
             "message_id": bot_msg.id,
             "latency_ms": round(total_latency_ms, 2),
+            "pipeline_stages": {
+                "retrieval": "local hybrid + reranker",
+                "generation": f"{generation_provider}/{generation_model}".rstrip("/"),
+                "validation": "local QA + grounding",
+            },
         }
         yield f"data: {json.dumps(final_payload)}\n\n"
         if not has_private_doc:

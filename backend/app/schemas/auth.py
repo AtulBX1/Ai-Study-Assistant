@@ -37,6 +37,7 @@ class UserResponse(BaseModel):
     role: str
     public_handle: str
     show_on_leaderboards: bool
+    local_models_only: bool = False
 
 
 class PublicProfileUpdate(BaseModel):
@@ -44,6 +45,10 @@ class PublicProfileUpdate(BaseModel):
         default=None, min_length=3, max_length=20, pattern=r"^[A-Za-z0-9_-]+$"
     )
     show_on_leaderboards: bool | None = None
+
+
+class AISettingsUpdate(BaseModel):
+    local_models_only: bool
 
 
 class TokenResponse(BaseModel):

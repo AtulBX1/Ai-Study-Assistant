@@ -27,6 +27,7 @@ from app.routers import (
     syllabus,
     transformers,
 )
+from app.services.feature_ai import ai_status
 from app.services.model_warmup import start_model_warmup
 from app.services.rag.providers import provider_cooldown_status
 
@@ -98,6 +99,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.include_router(auth.router)
+
+
+@app.get("/system/ai-status", tags=["system"])
+async def system_ai_status() -> dict:
+    """Expose provider readiness without credentials."""
+    return ai_status(settings)
+
+
 app.include_router(analytics.router)
 app.include_router(documents.router)
 app.include_router(lab.router)

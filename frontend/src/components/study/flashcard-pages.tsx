@@ -24,6 +24,7 @@ export function FlashcardDecksPage({ prefillDocumentId, prefillTopic }: { prefil
   const [error, setError] = useState<string | null>(null);
   const [generating, setGenerating] = useState<number | null>(null);
   const [notice, setNotice] = useState<Record<number, string>>({});
+  const [pipelineStages, setPipelineStages] = useState<Record<number, Record<string, string>>>({});
   const [scope, setScope] = useState<Record<number, "document" | "pages" | "topic">>(prefillTopic ? { [prefillDocumentId ?? 0]: "topic" } : {});
   const [pageRanges, setPageRanges] = useState<Record<number, [string, string]>>({});
   const [topics, setTopics] = useState<Record<number, string>>(prefillTopic ? { [prefillDocumentId ?? 0]: prefillTopic } : {});
@@ -69,6 +70,7 @@ export function FlashcardDecksPage({ prefillDocumentId, prefillTopic }: { prefil
         ...(selectedScope === "pages" ? { page_start: Number(range[0]), ...(range[1] ? { page_end: Number(range[1]) } : {}) } : {}),
         ...(selectedScope === "topic" && topics[document.id] ? { chapter: topics[document.id] } : {}),
       });
+      setPipelineStages((current) => ({ ...current, [document.id]: result.pipelineStages }));
       setNotice((current) => ({
         ...current,
         [document.id]: `Created ${result.created} of ${result.requested} requested cards: glossary ${result.createdBySource.glossary ?? 0}, cloze ${result.createdBySource.cloze ?? 0}, AI ${result.createdBySource.ai ?? 0}.${result.created < result.requested ? ` Shortfall: ${Object.keys(result.shortfallReasons).length ? Object.keys(result.shortfallReasons).map((key) => key.replaceAll("_", " ")).join(", ") : "not enough new grounded facts were available"}.` : ""}`,
@@ -128,6 +130,7 @@ export function FlashcardDecksPage({ prefillDocumentId, prefillTopic }: { prefil
                   </div>
                 ) : null}
                 <p className="text-sm" aria-live="polite">{notice[document.id]}</p>
+                {pipelineStages[document.id] ? <details className="text-sm text-muted-foreground"><summary className="cursor-pointer">Under the hood</summary><ul className="mt-2 space-y-1">{Object.entries(pipelineStages[document.id]).map(([stage, detail]) => <li key={stage}><span className="capitalize">{stage}:</span> {detail}</li>)}</ul></details> : null}
               </CardContent>
             </Card>
           );

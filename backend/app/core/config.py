@@ -13,7 +13,9 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 class Settings(BaseSettings):
     """Runtime settings loaded from environment variables."""
 
-    model_config = SettingsConfigDict(env_file="../.env", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file="../.env", extra="ignore", env_ignore_empty=True
+    )
 
     backend: Literal["local", "prod"] = "local"
     backend_host: str = "0.0.0.0"
@@ -71,6 +73,38 @@ class Settings(BaseSettings):
     groq_base_url: str = "https://api.groq.com/openai/v1"
     groq_requests_per_minute: int = Field(default=25, ge=1)
     groq_tokens_per_minute: int = Field(default=5000, ge=1)
+    feature_chat_provider: Literal["groq", "gemini", "openai_compat"] | None = None
+    feature_chat_api_key: str | None = None
+    feature_chat_model: str | None = None
+    feature_chat_base_url: str | None = None
+    feature_chat_rpm: int | None = Field(default=None, ge=1)
+    feature_chat_tpm: int | None = Field(default=None, ge=1)
+    feature_quiz_provider: Literal["groq", "gemini", "openai_compat"] | None = None
+    feature_quiz_api_key: str | None = None
+    feature_quiz_model: str | None = None
+    feature_quiz_base_url: str | None = None
+    feature_quiz_rpm: int | None = Field(default=None, ge=1)
+    feature_quiz_tpm: int | None = Field(default=None, ge=1)
+    feature_flashcards_provider: Literal["groq", "gemini", "openai_compat"] | None = (
+        None
+    )
+    feature_flashcards_api_key: str | None = None
+    feature_flashcards_model: str | None = None
+    feature_flashcards_base_url: str | None = None
+    feature_flashcards_rpm: int | None = Field(default=None, ge=1)
+    feature_flashcards_tpm: int | None = Field(default=None, ge=1)
+    feature_summary_provider: Literal["groq", "gemini", "openai_compat"] | None = None
+    feature_summary_api_key: str | None = None
+    feature_summary_model: str | None = None
+    feature_summary_base_url: str | None = None
+    feature_summary_rpm: int | None = Field(default=None, ge=1)
+    feature_summary_tpm: int | None = Field(default=None, ge=1)
+    feature_syllabus_provider: Literal["groq", "gemini", "openai_compat"] | None = None
+    feature_syllabus_api_key: str | None = None
+    feature_syllabus_model: str | None = None
+    feature_syllabus_base_url: str | None = None
+    feature_syllabus_rpm: int | None = Field(default=None, ge=1)
+    feature_syllabus_tpm: int | None = Field(default=None, ge=1)
     llm_max_output_tokens: int = Field(default=1024, ge=1)
     llm_context_token_budget: int = Field(default=6000, ge=1)
     quiz_llm_min_delay_seconds: float = Field(default=1.0, ge=0)

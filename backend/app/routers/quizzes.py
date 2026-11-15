@@ -39,10 +39,6 @@ from app.services.quiz.grading import grade_answer, weak_question_ids
 from app.services.quiz.schemas import GenerationRequest, QuizQuestion
 from app.services.quiz.validation import embedding_similarity, validate_generated
 from app.services.rag.providers import (
-    GeminiProvider,
-    GroqProvider,
-    OllamaProvider,
-    ProviderChain,
     ProviderError,
     ProviderUnavailableError,
     RateLimitError,
@@ -90,33 +86,13 @@ def _source_topic(
     return question.topic or "General"
 
 
-def _provider() -> Any:
+def _provider(*, local_only: bool = False) -> Any:
     settings = get_settings()
-    if not settings.allow_external_llm:
+    if not settings.allow_external_llm and not local_only:
         raise ProviderUnavailableError("External LLM use is disabled.")
-    configured = []
-    for name in settings.llm_provider_chain.split(","):
-        name = name.strip().lower()
-        if name == "gemini" and settings.gemini_api_key:
-            configured.append(GeminiProvider())
-        elif name == "groq" and settings.groq_api_key:
-            configured.append(GroqProvider())
-        elif name == "ollama":
-            configured.append(OllamaProvider())
-    if configured:
-        return ProviderChain(
-            configured, context_budget=settings.llm_context_token_budget
-        )
-    if settings.llm_provider == "ollama":
-        return OllamaProvider()
-    if settings.llm_provider == "gemini":
-        provider = GeminiProvider()
-        if not provider.api_key:
-            raise ProviderUnavailableError("LLM provider key is missing.")
-        return provider
-    raise ProviderUnavailableError(
-        "Configured provider cannot generate structured quizzes."
-    )
+    from app.services.feature_ai import feature_provider
+
+    return feature_provider("quiz", local_only=local_only, settings=settings)
 
 
 def _question_payload(
@@ -352,7 +328,9 @@ def create_quiz(
     )
     if request.engine != "offline" and not private_selected:
         try:
-            ai_engine = LLMEngine(_provider())
+            ai_engine = LLMEngine(
+                _provider(local_only=True) if user.local_models_only else _provider()
+            )
         except ProviderUnavailableError as error:
             if request.engine == "ai":
                 raise HTTPException(
@@ -607,6 +585,14 @@ def create_quiz(
                 "by_type": report_by_type,
             },
         )
+    generator_names = sorted(
+        {item.provider or item.engine or "classic rules" for item in accepted}
+    )
+    report["pipeline_stages"] = {
+        "retrieval": "local document chunks",
+        "generation": ", ".join(generator_names),
+        "validation": "local QA + evidence validation",
+    }
     quiz = Quiz(
         owner_id=user.id,
         title=request.title,

@@ -279,6 +279,7 @@ export type ChatCompletion = {
   explanation?: ChatExplanation;
   message_id?: number;
   latency_ms?: number;
+  pipeline_stages?: Record<string, string>;
 };
 
 export function parseChatEvent(data: string):
