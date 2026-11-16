@@ -44,16 +44,30 @@ export function useSSE(
     }
 
     const controller = new AbortController();
+    let pendingEvents: SSEEvent[] = [];
+    let frame: number | null = null;
+    const flushEvents = () => {
+      if (!pendingEvents.length) return;
+      const batch = pendingEvents;
+      pendingEvents = [];
+      setSnapshot((previous) =>
+        previous.key === key
+          ? { ...previous, events: [...previous.events, ...batch] }
+          : previous,
+      );
+    };
     setSnapshot({ key, status: "connecting", events: [], error: null });
     fetchSSE(
       url,
       (event) => {
         if (controller.signal.aborted) return;
-        setSnapshot((previous) =>
-          previous.key === key
-            ? { ...previous, events: [...previous.events, event] }
-            : previous,
-        );
+        pendingEvents.push(event);
+        if (frame === null) {
+          frame = window.requestAnimationFrame(() => {
+            frame = null;
+            flushEvents();
+          });
+        }
       },
       controller.signal,
       () => {
@@ -66,12 +80,18 @@ export function useSSE(
         : { method, body, key: requestKey },
     )
       .then(() => {
+        if (frame !== null) window.cancelAnimationFrame(frame);
+        frame = null;
+        flushEvents();
         setSnapshot((previous) =>
           previous.key === key ? { ...previous, status: "closed" } : previous,
         );
       })
       .catch((caught: unknown) => {
         if (controller.signal.aborted) return;
+        if (frame !== null) window.cancelAnimationFrame(frame);
+        frame = null;
+        flushEvents();
         setSnapshot((previous) =>
           previous.key === key
             ? {
@@ -86,7 +106,10 @@ export function useSSE(
         );
       });
 
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+      if (frame !== null) window.cancelAnimationFrame(frame);
+    };
   }, [body, enabled, key, method, requestKey, url]);
 
   return {

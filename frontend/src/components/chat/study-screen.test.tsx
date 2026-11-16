@@ -353,17 +353,39 @@ describe("study screen", () => {
 });
 
 describe("safe markdown answers", () => {
+  it("renders dollar and parenthesis math delimiters, including display math", () => {
+    const { container } = render(
+      <MarkdownAnswer
+        content={"Inline $x^2$ and \\(y_1\\).\n\n\\[a^2 + b^2 = c^2\\]\n\n$$u^2 + v^2$$"}
+        onCitationClick={vi.fn()}
+      />,
+    );
+    expect(container.querySelectorAll(".katex").length).toBe(4);
+    expect(container.querySelectorAll(".katex-display").length).toBe(2);
+  });
+
   it("does not create script elements or javascript links and makes citations actionable", () => {
     const onCitation = vi.fn();
     const { container } = render(
       <MarkdownAnswer
-        content={'<script>alert(1)</script> [unsafe](javascript:alert(1)) [doc, p.7]'}
+        content={'<script>alert(1)</script>\n\n[unsafe](javascript:alert(1)) [doc, p.7]'}
         onCitationClick={onCitation}
       />,
     );
     expect(container.querySelector("script")).toBeNull();
     expect(container.querySelector('a[href^="javascript:"]')).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Go to doc, page 7" }));
+    const citation = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Go to doc, page 7"]',
+    );
+    if (!citation) throw new Error("Expected a rendered citation button.");
+    fireEvent.click(citation);
     expect(onCitation).toHaveBeenCalledWith(7, "doc");
   });
+});
+
+it("uses normal as the initial chat answer style", async () => {
+  renderScreen();
+  expect(
+    await screen.findByRole("combobox", { name: "Answer style" }),
+  ).toHaveProperty("value", "normal");
 });

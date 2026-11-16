@@ -6,7 +6,10 @@ UNTRUSTED_CONTEXT_HEADER = "<<<BEGIN UNTRUSTED DOCUMENT CONTEXT>>>"
 UNTRUSTED_CONTEXT_FOOTER = "<<<END UNTRUSTED DOCUMENT CONTEXT>>>"
 
 MODE_INSTRUCTIONS = {
-    "normal": "Provide a direct, clear, and well-structured answer.",
+    "normal": (
+        "Answer in under about 200 words. Use a few short bullets, lead with the "
+        "answer, and omit background details that are not needed."
+    ),
     "simple": "Explain in simple, beginner-friendly terms. Avoid unnecessary jargon.",
     "in-depth": (
         "Provide a comprehensive, technical, and detailed explanation covering nuances "
@@ -47,13 +50,16 @@ def build_system_prompt(mode: str = "normal", language: str = "English") -> str:
         "1. Answer ONLY using facts directly stated in the document context. Do NOT "
         "extrapolate or assume.\n"
         "2. If the context does not contain enough information to answer the question, "
-        "you must respond with: 'not found in the document'.\n"
+        "say 'not found in the document' and, when topics are provided, suggest the "
+        "nearest topics from that document.\n"
         "3. Cite every fact using the exact format: [document_title, p.N] matching the "
         "document name and page number given in each chunk header (for example: "
         "[lecture1.pdf, p.3]).\n\n"
         f"STYLE & LANGUAGE:\n"
         f"- Mode: {mode_text}\n"
-        f"- Target Language: You must write the entire response in {target_language}."
+        f"- Target Language: You must write the entire response in {target_language}.\n"
+        "- For mathematical notation, use $...$ for inline math and $$...$$ for "
+        "display math. Keep equations concise."
     )
 
 

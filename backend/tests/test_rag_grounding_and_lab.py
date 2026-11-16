@@ -110,9 +110,10 @@ def test_refuses_when_top_rerank_score_is_below_threshold(
     )
     events = _events(response.text)
     assert events[-1]["done"] is True
-    assert "not found in the document" in [event.get("token") for event in events]
+    assert events[0]["token"].startswith("not found in the document")
+    assert "NLP [notes.pdf, p.1]" in events[0]["token"]
     saved = db_session.scalar(select(Message).where(Message.role == "assistant"))
-    assert saved.content == "not found in the document"
+    assert saved.content.startswith("not found in the document")
     client.app.dependency_overrides.clear()
 
 

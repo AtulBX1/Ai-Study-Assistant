@@ -7,13 +7,14 @@ import logging
 import re
 import time
 from collections.abc import Iterator, Sequence
+from difflib import SequenceMatcher
 from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings, get_settings
-from app.models import Chunk, Document, Message
+from app.models import Chunk, Document, DocumentKeyTerm, Message
 from app.retrieval import ChunkRecord, get_retriever
 from app.services.rag.grounding import evaluate_grounding
 from app.services.rag.prompts import (
@@ -283,6 +284,46 @@ class RAGChatPipeline:
             "latency_ms": round(latency_ms, 2),
         }
 
+    @staticmethod
+    def nearest_document_topics(
+        db: Session, user_id: int, doc_ids: list[int] | None, query: str
+    ) -> list[dict[str, Any]]:
+        """Find nearby section names and key terms only within the user's documents."""
+        section_query = (
+            select(Chunk.section, Chunk.page, Document.title)
+            .join(Document, Document.id == Chunk.doc_id)
+            .where(Document.owner_id == user_id, Chunk.section.is_not(None))
+        )
+        term_query = (
+            select(DocumentKeyTerm.term, DocumentKeyTerm.page, Document.title)
+            .join(Document, Document.id == DocumentKeyTerm.document_id)
+            .where(Document.owner_id == user_id)
+        )
+        if doc_ids is not None:
+            section_query = section_query.where(Document.id.in_(doc_ids))
+            term_query = term_query.where(Document.id.in_(doc_ids))
+        candidates = list(db.execute(section_query)) + list(db.execute(term_query))
+        query_words = set(re.findall(r"[a-z0-9]+", query.casefold()))
+        ranked: dict[str, tuple[float, dict[str, Any]]] = {}
+        for label, page, title in candidates:
+            label = str(label or "").strip()
+            words = set(re.findall(r"[a-z0-9]+", label.casefold()))
+            if len(label) < 3 or not words:
+                continue
+            overlap = len(words & query_words) / len(words)
+            similarity = SequenceMatcher(
+                None, " ".join(sorted(words)), " ".join(sorted(query_words))
+            ).ratio()
+            score = overlap + similarity * 0.25
+            key = label.casefold()
+            if key not in ranked or score > ranked[key][0]:
+                ranked[key] = (
+                    score,
+                    {"topic": label, "page": page, "document_title": title},
+                )
+        ordered = sorted(ranked.values(), key=lambda row: row[0], reverse=True)
+        return [item for _, item in ordered[:3]]
+
     def parse_citations(
         self, answer_text: str, chunks: list[dict[str, Any]]
     ) -> list[dict[str, Any]]:
@@ -352,6 +393,15 @@ class RAGChatPipeline:
 
         if not chunks or top_score < self.settings.rag_retrieval_confidence_threshold:
             refusal = "not found in the document"
+            nearest_topics = self.nearest_document_topics(
+                db, user_id, doc_ids, search_query
+            )
+            if nearest_topics:
+                suggestions = "; ".join(
+                    f"{item['topic']} [{item['document_title']}, p.{item['page']}]"
+                    for item in nearest_topics
+                )
+                refusal += f". Try asking about: {suggestions}."
             latency_ms = (time.perf_counter() - start_time) * 1000.0
             explanation = self.build_explanation(
                 chunks, refusal, mode, "answered by: retrieval guard", latency_ms
@@ -380,6 +430,11 @@ class RAGChatPipeline:
                 "explanation": explanation,
                 "message_id": bot_msg.id,
                 "latency_ms": round(latency_ms, 2),
+                "pipeline_stages": {
+                    "retrieval": "local hybrid retrieval; no relevant passage found",
+                    "generation": "retrieval guard",
+                    "validation": "local retrieval confidence threshold",
+                },
             }
             yield f"data: {json.dumps(refusal_payload)}\n\n"
             return

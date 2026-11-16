@@ -37,7 +37,11 @@ export function isUnsupportedSentence(
 }
 
 export function isNotFoundRefusal(content: string): boolean {
-  return normalizeSentence(content.replace(/[.!]+$/, "")) === "not found in the document";
+  const normalized = normalizeSentence(content.replace(/[.!]+$/, ""));
+  return (
+    normalized === "not found in the document" ||
+    normalized.startsWith("not found in the document try asking about")
+  );
 }
 
 export function stripMarkdownAndCitations(content: string): string {
