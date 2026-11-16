@@ -415,3 +415,87 @@ def test_ai_only_non_private_does_not_fall_back_offline(
     question = db_session.query(Question).filter_by(quiz_id=response.json()["id"]).one()
     assert question.engine == "ai"
     assert question.options["provider"] == "fake-provider"
+
+
+def test_public_web_quiz_items_are_saved_with_matching_quotes_and_urls(
+    client, db_session, monkeypatch
+):
+    user = _user(db_session, "quiz-web@example.test")
+    document = Document(
+        owner_id=user.id,
+        title="Public notes",
+        status="ready",
+        is_private=False,
+    )
+    db_session.add(document)
+    db_session.flush()
+    chunk = Chunk(
+        doc_id=document.id,
+        page=1,
+        page_start=1,
+        page_end=1,
+        text="The Python Software Foundation maintains the Python language.",
+        token_count=9,
+        chunk_index=0,
+    )
+    db_session.add(chunk)
+    db_session.commit()
+    note_question = _source_question(
+        chunk,
+        answer="Python Software Foundation",
+        evidence="The Python Software Foundation maintains the Python language.",
+        question="Which foundation maintains the Python language?",
+    )
+
+    class FakeOffline:
+        qa_model = staticmethod(lambda *_: "Python Software Foundation")
+
+        def generate(self, *_args, **_kwargs):
+            return [note_question]
+
+    source = {
+        "title": "Python reference",
+        "url": "https://example.test/python",
+        "domain": "example.test",
+        "snippet": "The Python Foundation supports open source language development.",
+    }
+    monkeypatch.setattr(quizzes, "ClassicEngine", FakeOffline)
+    monkeypatch.setattr(
+        "app.services.web_search.search_web", lambda *_args: ([source], None)
+    )
+    response = client.post(
+        "/quizzes",
+        headers=_headers(user),
+        json={
+            "document_ids": [document.id],
+            "engine": "offline",
+            "question_types": ["short_answer"],
+            "count": 1,
+            "use_web_search": True,
+        },
+    )
+    assert response.status_code == 201, response.text
+    quiz_id = response.json()["id"]
+    quiz = client.get(f"/quizzes/{quiz_id}", headers=_headers(user)).json()
+    web_question = next(
+        item for item in quiz["questions"] if item["source_type"] == "web"
+    )
+    assert web_question["source_page_url"] == source["url"]
+    assert web_question["explanation"] is None
+    assert web_question["evidence"] is None
+    assert quiz["report"]["web_questions"][0]["url"] == source["url"]
+    assert "quote" not in quiz["report"]["web_questions"][0]
+    attempt = client.post(f"/quizzes/{quiz_id}/attempts", headers=_headers(user)).json()
+    submitted = client.post(
+        f"/quizzes/{quiz_id}/attempts/{attempt['attempt_id']}/submit",
+        headers=_headers(user),
+        json={
+            "answers": [
+                {"question_id": web_question["id"], "answer": source["snippet"]}
+            ]
+        },
+    )
+    assert submitted.status_code == 200
+    result = submitted.json()["results"][0]
+    assert result["source_page_url"] == source["url"]
+    assert result["source_quote"] == source["snippet"]

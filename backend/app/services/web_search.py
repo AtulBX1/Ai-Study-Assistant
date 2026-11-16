@@ -121,3 +121,27 @@ def web_study_items(sources: list[dict[str, str]]) -> list[dict[str, str]]:
             }
         )
     return items
+
+
+def web_quiz_items(sources: list[dict[str, str]]) -> list[dict[str, str]]:
+    """Create bounded short-answer items whose answer is the exact source quote."""
+    items = []
+    for source in sources:
+        quote = source.get("snippet", "")
+        if len(quote.split()) < 5 or not valid_web_evidence(
+            {"url": source.get("url"), "quote": quote}, [source]
+        ):
+            continue
+        items.append(
+            {
+                "question": (
+                    f"According to {source['domain']}, what statement is reported?"
+                ),
+                "answer": quote,
+                "url": source["url"],
+                "quote": quote,
+                "title": source["title"],
+                "domain": source["domain"],
+            }
+        )
+    return items

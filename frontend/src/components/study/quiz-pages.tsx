@@ -166,6 +166,8 @@ function readAttemptSnapshot(
                 correctAnswer: typeof item.correctAnswer === "string" ? item.correctAnswer : null,
                 explanation: typeof item.explanation === "string" ? item.explanation : null,
                 sourcePageUrl: typeof item.sourcePageUrl === "string" ? item.sourcePageUrl : null,
+                sourceType: item.sourceType === "web" ? "web" : "notes",
+                sourceQuote: typeof item.sourceQuote === "string" ? item.sourceQuote : null,
                 answer: typeof item.answer === "string" ? item.answer : "",
               }];
             }),
@@ -741,6 +743,7 @@ export function QuizAttemptPage({ quizId }: { quizId: number }) {
               <h2 className="text-lg font-semibold">{question.question}</h2>
               <EngineBadge engine={question.engine} provider={question.provider} />
             </div>
+              {question.sourceType === "web" && question.sourcePageUrl ? <p className="text-xs text-muted-foreground">Based on web (not in your notes) · <a className="underline" href={question.sourcePageUrl} target="_blank" rel="noreferrer">Open source</a></p> : null}
             {question.options?.length ? (
               <fieldset className="grid gap-2">
                 <legend className="sr-only">Answer choices</legend>
@@ -940,7 +943,7 @@ export function QuizResultsPage({
                     <p className="text-sm">Correct answer: {answer?.correctAnswer ?? "Not returned by the results API."}</p>
                     <p className="text-sm text-muted-foreground">{answer?.explanation ?? "No explanation was provided."}</p>
                     <p className="text-sm">{answer?.isCorrect ? "Correct" : "Incorrect"}</p>
-                    {href ? <Link className="text-sm text-primary underline" href={href}>View source on page {question.page}</Link> : <p className="text-sm text-muted-foreground">Source document link is not available.</p>}
+                    {question.sourceType === "web" && answer?.sourcePageUrl ? <div className="space-y-1 text-sm"><p>Based on web (not in your notes).</p>{answer.sourceQuote ? <blockquote>Quote: “{answer.sourceQuote}”</blockquote> : null}<a className="text-primary underline" href={answer.sourcePageUrl} target="_blank" rel="noreferrer">Open source</a></div> : href ? <Link className="text-sm text-primary underline" href={href}>View source on page {question.page}</Link> : <p className="text-sm text-muted-foreground">Source document link is not available.</p>}
                   </CardContent>
                 </Card>
               );

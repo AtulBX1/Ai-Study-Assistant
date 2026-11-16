@@ -16,6 +16,7 @@ export type QuizQuestion = {
   provider: string | null;
   topic: string | null;
   sourcePageUrl: string | null;
+  sourceType: "web" | "notes";
 };
 
 export type QuizRecord = {
@@ -43,6 +44,8 @@ export type QuizAnswerResult = {
   correctAnswer: string | null;
   explanation: string | null;
   sourcePageUrl: string | null;
+  sourceType: "web" | "notes";
+  sourceQuote: string | null;
   answer: string;
 };
 
@@ -87,6 +90,7 @@ function questionFrom(value: unknown): QuizQuestion {
     provider: optionalString(value.provider),
     topic: optionalString(value.topic),
     sourcePageUrl: optionalString(value.source_page_url),
+    sourceType: value.source_type === "web" ? "web" : "notes",
   };
 }
 
@@ -196,6 +200,8 @@ export async function submitQuizAttempt(
           correctAnswer: optionalString(item.correct_answer),
           explanation: optionalString(item.explanation),
           sourcePageUrl: optionalString(item.source_page_url),
+          sourceType: item.source_type === "web" ? "web" : "notes",
+          sourceQuote: optionalString(item.source_quote),
           answer: "",
         },
       ];
@@ -232,6 +238,8 @@ export async function getQuizResults(
           correctAnswer: optionalString(item.correct_answer),
           explanation: optionalString(item.explanation),
           sourcePageUrl: optionalString(item.source_page_url),
+          sourceType: item.source_type === "web" ? "web" : "notes",
+          sourceQuote: optionalString(item.source_quote),
           answer: optionalString(item.answer) ?? "",
         },
       ];

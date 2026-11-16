@@ -43,7 +43,7 @@ from app.services.rag.providers import (
     ProviderUnavailableError,
     RateLimitError,
 )
-from app.services.web_search import web_study_items
+from app.services.web_search import web_quiz_items
 
 router = APIRouter(prefix="/quizzes", tags=["quizzes"])
 AuthenticatedUser = Annotated[User, Depends(get_current_user)]
@@ -106,22 +106,39 @@ def _question_payload(
         "question": question.prompt,
         "type": question.type,
         "options": options,
-        "explanation": question.explanation,
-        "evidence": metadata.get("evidence", question.explanation),
-        "source_highlight": metadata.get("evidence", question.explanation),
+        "explanation": (
+            None if metadata.get("source_type") == "web" else question.explanation
+        ),
+        "evidence": (
+            None
+            if metadata.get("source_type") == "web"
+            else metadata.get("evidence", question.explanation)
+        ),
+        "source_highlight": (
+            None
+            if metadata.get("source_type") == "web"
+            else metadata.get("evidence", question.explanation)
+        ),
         "source_chunk_id": question.source_chunk_id,
         "page": question.page,
         "difficulty": question.difficulty,
         "engine": question.engine,
         "topic": question.topic,
-        "source_page_url": (
-            f"/documents/{metadata.get('document_id', '')}/pages/{question.page}"
-        ),
+        "source_page_url": _question_source_url(question, metadata),
+        "source_type": metadata.get("source_type", "notes"),
         "provider": metadata.get("provider"),
     }
     if include_answer:
         payload["correct_answer"] = question.answer
     return payload
+
+
+def _question_source_url(question: Question, metadata: dict[str, Any]) -> str | None:
+    if metadata.get("source_type") == "web":
+        return metadata.get("source_url")
+    if metadata.get("document_id"):
+        return f"/documents/{metadata['document_id']}/pages/{question.page}"
+    return None
 
 
 def _type_quotas(request: GenerationRequest) -> dict[str, int]:
@@ -584,6 +601,11 @@ def create_quiz(
             rejects["insufficient_valid_questions"] += missing
             rejects_by_type[kind]["insufficient_valid_questions"] += missing
     report_by_type = _type_report(requested_by_type, produced_by_type, rejects_by_type)
+    web_questions = web_quiz_items(web_sources)
+    web_source_index = {
+        source["url"]: {key: source[key] for key in ("title", "url", "domain")}
+        for source in web_sources
+    }
     report = {
         "accepted": len(accepted),
         "rejected": _top_rejections(rejects),
@@ -599,9 +621,19 @@ def create_quiz(
                 {"document_title": doc.title, "document_id": doc.id}
                 for doc in documents
             ],
-            "web": web_sources,
+            "web": list(web_source_index.values()),
         },
-        "web_items": web_study_items(web_sources),
+        "web_items": [
+            {
+                "text": "Based on web (not in your notes)",
+                **web_source_index[item["url"]],
+            }
+            for item in web_questions
+        ],
+        "web_questions": [
+            {key: item[key] for key in ("question", "url", "title", "domain")}
+            for item in web_questions
+        ],
         **({"web_notice": web_notice} if web_notice else {}),
     }
     if not accepted:
@@ -672,12 +704,39 @@ def create_quiz(
                 page=item.page,
             )
         )
+    for item in web_questions:
+        db.add(
+            Question(
+                quiz_id=quiz.id,
+                type="short_answer",
+                difficulty="medium",
+                prompt=item["question"],
+                options={
+                    "choices": None,
+                    "provider": None,
+                    "evidence": item["quote"],
+                    "source_type": "web",
+                    "source_url": item["url"],
+                    "source_title": item["title"],
+                    "source_domain": item["domain"],
+                    "quote": item["quote"],
+                },
+                answer=item["answer"],
+                explanation=(
+                    "Based on web (not in your notes). Quote: " + item["quote"]
+                ),
+                source_chunk_id=None,
+                engine="web",
+                topic=item["domain"],
+                page=1,
+            )
+        )
     db.commit()
     return {
         "id": quiz.id,
         "title": quiz.title,
         "engine": quiz.engine,
-        "questions": len(accepted),
+        "questions": len(accepted) + len(web_questions),
         "report": report,
     }
 
@@ -744,12 +803,13 @@ def question_explanation(
     metadata = question.options if isinstance(question.options, dict) else {}
     return {
         "question_id": question.id,
-        "explanation": question.explanation,
+        "explanation": (
+            None if metadata.get("source_type") == "web" else question.explanation
+        ),
         "source_chunk_id": question.source_chunk_id,
         "page": question.page,
-        "source_page_url": (
-            f"/documents/{metadata.get('document_id', '')}/pages/{question.page}"
-        ),
+        "source_page_url": _question_source_url(question, metadata),
+        "source_type": metadata.get("source_type", "notes"),
     }
 
 
@@ -830,10 +890,9 @@ def submit_answers(
                     "is_correct": item.is_correct,
                     "correct_answer": question.answer,
                     "explanation": question.explanation,
-                    "source_page_url": (
-                        f"/documents/{metadata.get('document_id', '')}"
-                        f"/pages/{question.page}"
-                    ),
+                    "source_page_url": _question_source_url(question, metadata),
+                    "source_type": metadata.get("source_type", "notes"),
+                    "source_quote": metadata.get("quote"),
                 }
             )
             previous_by_topic[
@@ -854,6 +913,9 @@ def submit_answers(
     by_topic: dict[str, list[bool]] = defaultdict(list)
     rubric_provider = None
     if not any(
+        isinstance(item.options, dict) and item.options.get("source_type") == "web"
+        for item in questions.values()
+    ) and not any(
         (
             db.get(Chunk, item.source_chunk_id).document.is_private
             if item.source_chunk_id and db.get(Chunk, item.source_chunk_id)
@@ -915,10 +977,9 @@ def submit_answers(
                 "is_correct": is_correct,
                 "correct_answer": question.answer,
                 "explanation": question.explanation,
-                "source_page_url": (
-                    f"/documents/{metadata.get('document_id', '')}"
-                    f"/pages/{question.page}"
-                ),
+                "source_page_url": _question_source_url(question, metadata),
+                "source_type": metadata.get("source_type", "notes"),
+                "source_quote": metadata.get("quote"),
             }
         )
     total = len(request.answers)
@@ -986,9 +1047,19 @@ def results(
                 "question_id": answer.question_id,
                 "is_correct": answer.is_correct,
                 "explanation": question.explanation,
-                "source_page_url": (
-                    f"/documents/{(question.options or {}).get('document_id', '')}"
-                    f"/pages/{question.page}"
+                "source_page_url": _question_source_url(
+                    question,
+                    question.options if isinstance(question.options, dict) else {},
+                ),
+                "source_type": (
+                    question.options.get("source_type", "notes")
+                    if isinstance(question.options, dict)
+                    else "notes"
+                ),
+                "source_quote": (
+                    question.options.get("quote")
+                    if isinstance(question.options, dict)
+                    else None
                 ),
             }
             for answer, question in rows
