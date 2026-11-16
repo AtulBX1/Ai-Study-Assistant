@@ -37,6 +37,8 @@ export type ChatExplanation = {
   mode?: string;
   latency_ms?: number;
   retrieval_mode?: string;
+  sources?: { your_notes?: Array<{ document_title?: string; page?: number; chunk_id?: number }>; web?: Array<{ title: string; url: string; domain: string; snippet: string }> };
+  web_notice?: string;
 };
 
 export type ChatMessageRecord = {
@@ -155,6 +157,8 @@ function parseExplanation(value: unknown): ChatExplanation {
     ...(typeof value.retrieval_mode === "string"
       ? { retrieval_mode: value.retrieval_mode }
       : {}),
+    ...(isRecord(value.sources) ? { sources: value.sources as ChatExplanation["sources"] } : {}),
+    ...(typeof value.web_notice === "string" ? { web_notice: value.web_notice } : {}),
   };
 }
 

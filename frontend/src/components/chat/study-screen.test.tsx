@@ -175,6 +175,7 @@ describe("study screen", () => {
         mode: "exam-style",
         language: "Punjabi",
         doc_ids: [42],
+        use_web_search: false,
       },
     ]);
     expect(

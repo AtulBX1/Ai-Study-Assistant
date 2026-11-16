@@ -64,6 +64,7 @@ class PostMessageRequest(BaseModel):
     mode: Literal["normal", "simple", "in-depth", "exam-style"] = "normal"
     language: Literal["English", "Hindi", "Punjabi"] = "English"
     doc_ids: list[int] | None = None
+    use_web_search: bool = False
 
 
 class FeedbackRequest(BaseModel):
@@ -229,6 +230,7 @@ def post_message(
         mode=request.mode,
         language=request.language,
         doc_ids=request.doc_ids,
+        use_web_search=request.use_web_search,
     )
 
     return StreamingResponse(

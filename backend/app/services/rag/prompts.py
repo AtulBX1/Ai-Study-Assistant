@@ -86,6 +86,26 @@ def build_context_block(chunks: list[dict[str, object]]) -> str:
     return "\n".join(lines)
 
 
+def build_grounded_context(
+    chunks: list[dict[str, object]], web: list[dict[str, str]]
+) -> str:
+    """Format notes and optional web results as separate untrusted data sources."""
+    notes = ["[YOUR NOTES]"]
+    for chunk in chunks:
+        page = chunk.get("page") or chunk.get("page_start") or 1
+        chunk_id = chunk.get("chunk_id")
+        title = chunk.get("document_title")
+        notes.append(f"[chunk {chunk_id}, {title}, p.{page}]")
+        notes.append(str(chunk.get("text", "")).strip())
+    lines = ["[YOUR NOTES]", *notes[1:], "[/YOUR NOTES]", "[WEB]"]
+    for item in web:
+        lines.extend(
+            (f"[title: {item['title']}; URL: {item['url']} ]", item["snippet"])
+        )
+    lines.append("[/WEB]")
+    return "\n".join(lines)
+
+
 REWRITE_SYSTEM_PROMPT = (
     "You are a search query reformulation assistant. Given the recent conversation "
     "history and a follow-up user question, rewrite the question into an independent, "

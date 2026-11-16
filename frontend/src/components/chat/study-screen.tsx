@@ -245,6 +245,7 @@ export function StudyScreen({ documentId }: { documentId: number }) {
   const [input, setInput] = useState("");
   const [mode, setMode] = useState<ChatOptions["mode"]>("normal");
   const [language, setLanguage] = useState<ChatOptions["language"]>("English");
+  const [useWebSearch, setUseWebSearch] = useState(false);
   const [request, setRequest] = useState<StreamState | null>(null);
   const [preparing, setPreparing] = useState(false);
   const [streamError, setStreamError] = useState<string | null>(null);
@@ -455,6 +456,7 @@ export function StudyScreen({ documentId }: { documentId: number }) {
         mode,
         language,
         doc_ids: [documentId],
+        use_web_search: useWebSearch,
       };
       setRequest({
         key: String(++streamSequence.current),
@@ -863,6 +865,14 @@ export function StudyScreen({ documentId }: { documentId: number }) {
                 ) : (
                   <p className="whitespace-pre-wrap">{message.content}</p>
                 )}
+                {message.role === "assistant" && message.explanation?.sources ? (
+                  <div className="mt-3 border-t border-border pt-2 text-xs">
+                    <strong>Your notes</strong>
+                    <p>{message.explanation.sources.your_notes?.map((source) => `${source.document_title ?? "Document"}, p.${source.page ?? "?"}`).join(" · ") || "No matching notes"}</p>
+                    {message.explanation.sources.web?.length ? <><strong className="mt-2 block">Web</strong><ul>{message.explanation.sources.web.map((source) => <li key={source.url}><a className="underline" href={source.url} target="_blank" rel="noreferrer">{source.title} ({source.domain})</a></li>)}</ul></> : null}
+                    {message.explanation.web_notice ? <p role="status">{message.explanation.web_notice}</p> : null}
+                  </div>
+                ) : null}
                 {message.role === "assistant" && isNotFoundRefusal(message.content) ? (
                   <div className="mt-3 flex flex-wrap gap-2 border-t border-amber-600/30 pt-3">
                     <p className="w-full text-xs font-medium text-amber-900 dark:text-amber-100">
@@ -1032,6 +1042,10 @@ export function StudyScreen({ documentId }: { documentId: number }) {
               <label className="col-span-2 flex items-center gap-2 text-xs text-muted-foreground sm:col-span-3">
                 <input type="checkbox" checked disabled readOnly />
                 Rerank when available (backend controlled)
+              </label>
+              <label className="col-span-2 flex items-center gap-2 text-xs text-muted-foreground sm:col-span-3">
+                <input aria-label="Use web search" type="checkbox" checked={useWebSearch} onChange={(event) => setUseWebSearch(event.target.checked)} />
+                Use web search (topic query only)
               </label>
             </fieldset>
             <div className="flex items-end gap-2">

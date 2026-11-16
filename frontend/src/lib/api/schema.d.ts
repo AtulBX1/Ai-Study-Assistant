@@ -2427,6 +2427,7 @@ export interface components {
             language: "English" | "Hindi" | "Punjabi";
             /** Doc Ids */
             doc_ids?: number[] | null;
+            use_web_search?: boolean;
         };
         /**
          * PreprocessRequest
