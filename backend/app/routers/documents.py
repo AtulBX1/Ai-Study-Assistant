@@ -7,6 +7,7 @@ import threading
 import time
 from collections import OrderedDict
 from collections.abc import Generator
+from threading import Lock
 from typing import Annotated
 from urllib.parse import quote
 from uuid import uuid4
@@ -28,9 +29,15 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings, get_settings
-from app.core.database import get_db
+from app.core.database import SessionLocal, get_db
 from app.dependencies.auth import get_current_user
-from app.models import Document, DocumentPage, DocumentStatusEvent, User
+from app.models import (
+    Document,
+    DocumentPage,
+    DocumentStatusEvent,
+    DocumentSummary,
+    User,
+)
 from app.schemas.documents import DocumentPageResponse, DocumentResponse
 from app.services.chunking import (
     DEFAULT_CHUNK_SIZE,
@@ -53,6 +60,8 @@ from app.workers.document_tasks import process_document_job
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/documents", tags=["documents"])
+_key_point_jobs: dict[str, dict] = {}
+_key_point_lock = Lock()
 DatabaseSession = Annotated[Session, Depends(get_db)]
 AuthenticatedUser = Annotated[User, Depends(get_current_user)]
 _image_cache: OrderedDict[tuple[int, int, str], bytes] = OrderedDict()
@@ -111,6 +120,130 @@ def _owned_document(db: Session, document_id: int, owner_id: int) -> Document:
     if document is None:
         raise HTTPException(status_code=404, detail="Document not found.")
     return document
+
+
+def _run_key_points(
+    job_id: str, document_id: int, owner_id: int, engine: str, local_only: bool
+) -> None:
+    from app.services.feature_ai import feature_provider
+    from app.services.study.key_points import generate_key_points
+
+    with _key_point_lock:
+        _key_point_jobs[job_id] = {"status": "running", "progress": 10}
+    db = SessionLocal()
+    try:
+        document = _owned_document(db, document_id, owner_id)
+        provider = feature_provider("summary", local_only=local_only)
+        payload = generate_key_points(db, document, engine, provider)
+        record = DocumentSummary(
+            document_id=document.id,
+            owner_id=owner_id,
+            summary_type="key_points",
+            engine_requested=engine,
+            engine_used=payload["engine_used"],
+            fallback_reason=payload["fallback_reason"],
+            content="\n".join(item["text"] for item in payload["crux"]),
+            items=payload["crux"],
+            generation_metadata={"key_points": payload, "engine": engine},
+        )
+        db.add(record)
+        db.flush()
+        payload["id"] = record.id
+        record.generation_metadata = {"key_points": payload, "engine": engine}
+        db.commit()
+        db.refresh(record)
+        with _key_point_lock:
+            _key_point_jobs[job_id] = {
+                "status": "complete",
+                "progress": 100,
+                "result": payload,
+            }
+    except Exception as exc:
+        with _key_point_lock:
+            _key_point_jobs[job_id] = {
+                "status": "failed",
+                "progress": 100,
+                "error": str(exc),
+            }
+    finally:
+        db.close()
+
+
+@router.post("/{document_id}/key-points", status_code=202)
+def start_key_points(
+    document_id: int,
+    background_tasks: BackgroundTasks,
+    db: DatabaseSession,
+    user: AuthenticatedUser,
+    engine: str = Query("llm", pattern="^(llm|extractive|t5)$"),
+    regenerate: bool = False,
+):
+    """Queue or return cached chapter key points."""
+    document = _owned_document(db, document_id, user.id)
+    if not regenerate:
+        cached = db.scalar(
+            select(DocumentSummary)
+            .where(
+                DocumentSummary.document_id == document_id,
+                DocumentSummary.owner_id == user.id,
+                DocumentSummary.summary_type == "key_points",
+                DocumentSummary.engine_requested == engine,
+            )
+            .order_by(DocumentSummary.id.desc())
+        )
+        if (
+            cached
+            and cached.generation_metadata
+            and cached.generation_metadata.get("key_points")
+        ):
+            result = dict(cached.generation_metadata["key_points"])
+            result["id"] = cached.id
+            return {
+                "status": "complete",
+                "progress": 100,
+                "result": result,
+            }
+    job_id = uuid4().hex
+    with _key_point_lock:
+        _key_point_jobs[job_id] = {"status": "queued", "progress": 0}
+    background_tasks.add_task(
+        _run_key_points, job_id, document.id, user.id, engine, user.local_models_only
+    )
+    return {"job_id": job_id, "status": "queued", "progress": 0}
+
+
+@router.get("/{document_id}/key-points")
+def get_key_points(
+    document_id: int,
+    db: DatabaseSession,
+    user: AuthenticatedUser,
+    job_id: str | None = None,
+    engine: str = Query("llm", pattern="^(llm|extractive|t5)$"),
+):
+    """Read the latest engine-specific key points or job progress."""
+    _owned_document(db, document_id, user.id)
+    if job_id:
+        with _key_point_lock:
+            return _key_point_jobs.get(job_id, {"status": "missing", "progress": 0})
+    cached = db.scalar(
+        select(DocumentSummary)
+        .where(
+            DocumentSummary.document_id == document_id,
+            DocumentSummary.owner_id == user.id,
+            DocumentSummary.summary_type == "key_points",
+            DocumentSummary.engine_requested == engine,
+        )
+        .order_by(DocumentSummary.id.desc())
+    )
+    if cached and cached.generation_metadata:
+        result = dict(cached.generation_metadata.get("key_points") or {})
+        result["id"] = cached.id
+        return {
+            "status": "complete",
+            "progress": 100,
+            "result": result,
+        }
+    return {"status": "not_started", "progress": 0}
 
 
 def _remember_image(key: tuple[int, int, str], image: bytes, capacity: int) -> bytes:

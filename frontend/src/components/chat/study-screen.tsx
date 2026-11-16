@@ -269,6 +269,12 @@ export function StudyScreen({ documentId }: { documentId: number }) {
   const divider = useRef<HTMLDivElement>(null);
   const dragging = useRef(false);
   const viewer = useRef<PdfViewerHandle>(null);
+  useEffect(() => {
+    const page = Number(new URLSearchParams(window.location.search).get("page"));
+    if (!Number.isInteger(page) || page < 1) return;
+    const timer = window.setTimeout(() => viewer.current?.scrollToPage(page), 500);
+    return () => window.clearTimeout(timer);
+  }, []);
   const streamOpened = useRef(false);
   const streamSequence = useRef(0);
   const streamBody = useMemo(

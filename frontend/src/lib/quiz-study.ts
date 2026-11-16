@@ -279,6 +279,14 @@ export async function downloadExamPaper(
   return result.data;
 }
 
+export async function downloadStudyExport(kind: string, itemId: number, format: "pdf" | "docx"): Promise<Blob> {
+  const result = await apiClient.GET("/export/{kind}/{item_id}", {
+    params: { path: { kind, item_id: itemId }, query: { format } }, parseAs: "blob",
+  });
+  if (!result.response.ok || result.data === undefined) throw normalizeApiError(result.response.status, result.error);
+  return result.data;
+}
+
 export function reportSummary(
   report: JsonRecord,
   requestedCount?: number,

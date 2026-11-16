@@ -18,6 +18,33 @@ export type KeyTerm = {
   definition?: string;
 };
 
+export type KeyPointItem = {
+  kind?: string;
+  text: string;
+  evidence_sentence: string;
+  page: number;
+};
+export type KeyPointsResult = {
+  id?: number;
+  engine_requested: string;
+  engine_used: string;
+  fallback_reason?: string | null;
+  crux: KeyPointItem[];
+  sections: Array<{
+    title: string;
+    page_start: number;
+    page_end: number;
+    items: KeyPointItem[];
+  }>;
+};
+export type KeyPointsJob = {
+  job_id?: string;
+  status: string;
+  progress: number;
+  result?: KeyPointsResult;
+  error?: string;
+};
+
 export const DOCUMENT_PAGE_SIZE = 20;
 
 export async function listDocuments(
@@ -192,6 +219,29 @@ async function authorizedDocumentFetch(
     response = await request();
   }
   return response;
+}
+
+export async function requestKeyPoints(
+  id: number,
+  engine: string,
+  regenerate = false,
+): Promise<KeyPointsJob> {
+  const response = await authorizedDocumentFetch(`/documents/${id}/key-points?engine=${engine}&regenerate=${regenerate}`, undefined, { method: "POST" });
+  const body = await response.json();
+  if (!response.ok) throw normalizeApiError(response.status, body);
+  return body as KeyPointsJob;
+}
+
+export async function readKeyPoints(
+  id: number,
+  jobId?: string,
+  engine = "llm",
+): Promise<KeyPointsJob> {
+  const query = jobId ? `job_id=${encodeURIComponent(jobId)}` : `engine=${engine}`;
+  const response = await authorizedDocumentFetch(`/documents/${id}/key-points?${query}`);
+  const body = await response.json();
+  if (!response.ok) throw normalizeApiError(response.status, body);
+  return body as KeyPointsJob;
 }
 
 export async function getPublicProfile(): Promise<{
