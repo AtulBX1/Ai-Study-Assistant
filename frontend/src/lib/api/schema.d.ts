@@ -2644,6 +2644,7 @@ export interface components {
              * @default false
              */
             run_async: boolean;
+            use_web_search?: boolean;
         };
         /** SuspendRequest */
         SuspendRequest: {
@@ -2658,6 +2659,7 @@ export interface components {
             text?: string | null;
             /** Document Id */
             document_id?: number | null;
+            use_web_search?: boolean;
         };
         /** SyllabusRename */
         SyllabusRename: {
@@ -2856,6 +2858,7 @@ export interface components {
             /** @default auto */
             engine: components["schemas"]["QuizEngine"];
             difficulty?: components["schemas"]["Difficulty"] | null;
+            use_web_search?: boolean;
         };
     };
     responses: never;

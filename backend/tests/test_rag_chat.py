@@ -272,7 +272,7 @@ def test_provider_fallback_on_429_and_missing_key(
     client.app.dependency_overrides.clear()
 
 
-def test_private_document_routing(client: TestClient, db_session) -> None:
+def test_private_document_routing(client: TestClient, db_session, monkeypatch) -> None:
     user, doc = _setup_user_and_doc(db_session, "privacy@example.com", is_private=True)
     fake_ext = FakeProvider(name="gemini", is_external=True)
     pipe = RAGChatPipeline(
@@ -284,6 +284,11 @@ def test_private_document_routing(client: TestClient, db_session) -> None:
         settings=Settings(allow_external_llm=True, gemini_api_key="valid-key"),
     )
     client.app.dependency_overrides[get_rag_pipeline] = lambda: pipe
+    search_calls = []
+    monkeypatch.setattr(
+        "app.services.web_search.search_web",
+        lambda *args, **kwargs: search_calls.append(args) or ([], None),
+    )
 
     s_resp = client.post("/chat/sessions", headers=_auth_header(user.id), json={})
     sid = s_resp.json()["id"]
@@ -291,7 +296,7 @@ def test_private_document_routing(client: TestClient, db_session) -> None:
     resp = client.post(
         f"/chat/sessions/{sid}/messages",
         headers=_auth_header(user.id),
-        json={"query": "Tell me about this private paper"},
+        json={"query": "Tell me about this private paper", "use_web_search": True},
     )
     events = [
         json.loads(line[6:])
@@ -302,6 +307,7 @@ def test_private_document_routing(client: TestClient, db_session) -> None:
 
     # Must be routed away from external provider to extractive fallback
     assert "fallback: private document" in done["provider"]
+    assert search_calls == []
     client.app.dependency_overrides.clear()
 
 

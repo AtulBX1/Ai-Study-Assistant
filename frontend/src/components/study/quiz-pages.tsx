@@ -304,6 +304,7 @@ export function QuizBuilderPage({
   const [questionCount, setQuestionCount] = useState(String(prefillQuestionCount ?? 10));
   const [difficulty, setDifficulty] = useState<"mixed" | "easy" | "medium" | "hard">("mixed");
   const [engine, setEngine] = useState<"auto" | "classic" | "llm">("auto");
+  const [useWebSearch, setUseWebSearch] = useState(false);
   const [status, setStatus] = useState<"idle" | "generating" | "complete">("idle");
   const [generated, setGenerated] = useState<{
     id: number;
@@ -374,6 +375,7 @@ export function QuizBuilderPage({
         question_types: selectedTypes as never,
         engine: engine === "llm" ? "ai" : engine === "classic" ? "offline" : "auto",
         difficulty: difficulty === "mixed" ? null : difficulty,
+        use_web_search: useWebSearch,
       });
       let engineCounts: Record<string, number> = {};
       let engineDetailsError: string | null = null;
@@ -443,6 +445,11 @@ export function QuizBuilderPage({
             ))}
           </div>
         </fieldset>
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" aria-label="Use web search" checked={useWebSearch} disabled={selectedDocument?.is_private !== false} onChange={(event) => setUseWebSearch(event.target.checked)} />
+          Use web search for supplementary study items
+        </label>
+        {selectedDocument?.is_private ? <p className="text-xs text-muted-foreground">Web search is unavailable for private documents.</p> : null}
         {scope === "pages" ? (
           <div className="grid grid-cols-2 gap-3">
             <label className="space-y-2 text-sm">Page from
@@ -526,6 +533,8 @@ export function QuizBuilderPage({
               <EngineBadge engine={generated.engine} />
               {Object.keys(generated.engineCounts).length > 0 ? <p className="text-sm">Engine counts: {Object.entries(generated.engineCounts).map(([name, count]) => `${engineLabel(name)} ${count}`).join(" · ")}</p> : null}
               {summary ? <p className="text-sm">{summary}</p> : null}
+              {Array.isArray(generated.report.web_items) && generated.report.web_items.map((raw, index) => { const item = isRecord(raw) ? raw : {}; return <blockquote key={index} className="rounded border-l-2 border-primary pl-3 text-sm"><strong>Based on web (not in your notes)</strong><p>{String(item.text ?? "")}</p>{typeof item.url === "string" ? <a className="underline" href={item.url} target="_blank" rel="noreferrer">Source</a> : null}</blockquote>; })}
+              {typeof generated.report.web_notice === "string" ? <p role="status" className="text-sm text-muted-foreground">{generated.report.web_notice}</p> : null}
               {generated.engineDetailsError ? <p className="text-sm text-muted-foreground" role="status">Question engine details could not be verified: {generated.engineDetailsError}</p> : null}
               {isRecord(generated.report.pipeline_stages) ? <details className="text-sm text-muted-foreground"><summary className="cursor-pointer">Under the hood</summary><ul className="mt-2 space-y-1">{Object.entries(generated.report.pipeline_stages).map(([stage, detail]) => <li key={stage}><span className="capitalize">{stage}:</span> {String(detail)}</li>)}</ul></details> : null}
               {isRecord(generated.report.by_type) ? <div className="text-sm"><h3 className="font-medium">Produced / requested by type</h3><ul className="mt-1 grid grid-cols-2 gap-1">{Object.entries(generated.report.by_type).map(([kind, value]) => { const row = isRecord(value) ? value : {}; return <li key={kind}>{kind.replaceAll("_", " ")}: {typeof row.produced === "number" ? row.produced : 0} / {typeof row.requested === "number" ? row.requested : 0}</li>; })}</ul></div> : null}

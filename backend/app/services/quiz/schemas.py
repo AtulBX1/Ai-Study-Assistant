@@ -128,6 +128,7 @@ class GenerationRequest(BaseModel):
     )
     engine: QuizEngine = QuizEngine.AUTO
     difficulty: Difficulty | None = None
+    use_web_search: bool = False
 
     @field_validator("engine", mode="before")
     @classmethod

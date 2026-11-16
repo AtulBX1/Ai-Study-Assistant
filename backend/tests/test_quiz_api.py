@@ -84,6 +84,11 @@ def test_private_auto_routes_to_offline_without_provider(
 
     monkeypatch.setattr(quizzes, "ClassicEngine", FakeOffline)
     monkeypatch.setattr(quizzes, "_provider", forbidden_provider)
+    search_calls = []
+    monkeypatch.setattr(
+        "app.services.web_search.search_web",
+        lambda *args, **kwargs: search_calls.append(args) or ([], None),
+    )
     response = client.post(
         "/quizzes",
         headers=_headers(user),
@@ -93,6 +98,7 @@ def test_private_auto_routes_to_offline_without_provider(
             "engine": "auto",
             "question_types": ["short_answer"],
             "count": 1,
+            "use_web_search": True,
         },
     )
 
@@ -100,6 +106,7 @@ def test_private_auto_routes_to_offline_without_provider(
     result = response.json()
     assert result["engine"] == "auto"
     assert result["report"]["fallback_reason"] == "private_document"
+    assert search_calls == []
     assert result["report"]["by_type"]["short_answer"] == {
         "requested": 1,
         "produced": 1,

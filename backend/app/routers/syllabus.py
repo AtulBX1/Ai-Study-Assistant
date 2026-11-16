@@ -24,6 +24,7 @@ from app.models import (
 )
 from app.services.embeddings import EmbeddingService, get_embedding_service
 from app.services.syllabus import coverage, parse_syllabus, remap_syllabus, save_tree
+from app.services.web_search import web_study_items
 
 
 def remap_now(db: Session, item: Syllabus) -> None:
@@ -48,6 +49,7 @@ class SyllabusCreate(BaseModel):
     title: str = Field(min_length=1, max_length=255)
     text: str | None = None
     document_id: int | None = None
+    use_web_search: bool = False
 
 
 class SyllabusRename(BaseModel):
@@ -134,6 +136,7 @@ def create(
     if (request.text is None) == (request.document_id is None):
         raise HTTPException(422, "Provide exactly one of text or document_id.")
     text = request.text
+    document = None
     if request.document_id is not None:
         document = db.scalar(
             select(Document).where(
@@ -152,6 +155,31 @@ def create(
             )
         )
     syllabus = Syllabus(owner_id=user.id, title=request.title)
+    web_sources: list[dict[str, str]] = []
+    web_notice = None
+    if request.use_web_search and document is not None:
+        if user.local_models_only:
+            web_notice = (
+                "Web search is unavailable in local-only mode; "
+                "continuing with your notes only."
+            )
+        elif document.is_private:
+            web_notice = (
+                "Web search is unavailable for private documents; "
+                "continuing with your notes only."
+            )
+        else:
+            from app.services.web_search import search_web
+
+            web_sources, web_notice = search_web(request.title)
+    syllabus.web_sources = {
+        "your_notes": (
+            [{"document_id": document.id, "document_title": document.title}]
+            if document
+            else [{"label": "Provided syllabus text"}]
+        ),
+        "web": web_sources,
+    }
     db.add(syllabus)
     db.flush()
     save_tree(db, syllabus, parse_syllabus(text or ""))
@@ -161,6 +189,12 @@ def create(
         "id": syllabus.id,
         "title": syllabus.title,
         "tree": tree(db, syllabus),
+        "sources": {
+            "your_notes": syllabus.web_sources["your_notes"],
+            "web": web_sources,
+        },
+        "web_items": web_study_items(web_sources),
+        "web_notice": web_notice,
         "pipeline_stages": {
             "retrieval": (
                 "local document pages"
@@ -186,7 +220,16 @@ def list_syllabi(db: DatabaseSession, user: AuthenticatedUser) -> list[dict]:
 @router.get("/{syllabus_id}")
 def get(syllabus_id: int, db: DatabaseSession, user: AuthenticatedUser) -> dict:
     item = owned(db, syllabus_id, user.id)
-    return {"id": item.id, "title": item.title, "tree": tree(db, item)}
+    return {
+        "id": item.id,
+        "title": item.title,
+        "tree": tree(db, item),
+        "sources": {
+            "your_notes": (item.web_sources or {}).get("your_notes", []),
+            "web": (item.web_sources or {}).get("web", []),
+        },
+        "web_items": web_study_items((item.web_sources or {}).get("web", [])),
+    }
 
 
 @router.patch("/{syllabus_id}")

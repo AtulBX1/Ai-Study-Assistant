@@ -193,6 +193,7 @@ class Syllabus(TimestampMixin, Base):
         ForeignKey("users.id", ondelete="CASCADE"), index=True
     )
     title: Mapped[str] = mapped_column(String(255))
+    web_sources: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     topics: Mapped[list["SyllabusTopic"]] = relationship(
         back_populates="syllabus",
         cascade="all, delete-orphan",

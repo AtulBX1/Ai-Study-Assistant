@@ -2,7 +2,15 @@
 
 from conftest import access_token_for
 
-from app.models import Chunk, ChunkTopic, Document, Syllabus, SyllabusTopic, User
+from app.models import (
+    Chunk,
+    ChunkTopic,
+    Document,
+    DocumentPage,
+    Syllabus,
+    SyllabusTopic,
+    User,
+)
 from app.services.syllabus import coverage, parse_syllabus, remap_syllabus
 
 
@@ -122,3 +130,82 @@ def test_syllabus_owner_isolation(client, db_session):
         headers={"Authorization": f"Bearer {access_token_for(other.id)}"},
     )
     assert response.status_code == 404
+
+
+def test_private_syllabus_opt_in_never_triggers_web_search(
+    client, db_session, monkeypatch
+):
+    owner = User(
+        email="private-web-syllabus@test.local",
+        full_name="Owner",
+        password_hash="hash",
+    )
+    db_session.add(owner)
+    db_session.flush()
+    doc = Document(
+        owner_id=owner.id,
+        title="Private course",
+        status="ready",
+        is_private=True,
+    )
+    db_session.add(doc)
+    db_session.flush()
+    db_session.add(DocumentPage(document_id=doc.id, page_number=1, text=""))
+    db_session.commit()
+    calls = []
+    monkeypatch.setattr(
+        "app.services.web_search.search_web",
+        lambda *args, **kwargs: calls.append(args) or ([], None),
+    )
+    response = client.post(
+        "/syllabi",
+        headers={"Authorization": f"Bearer {access_token_for(owner.id)}"},
+        json={"title": "Private course", "document_id": doc.id, "use_web_search": True},
+    )
+    assert response.status_code == 200, response.text
+    assert calls == []
+    assert response.json()["sources"]["web"] == []
+
+
+def test_public_syllabus_stores_web_items_separately(client, db_session, monkeypatch):
+    owner = User(
+        email="public-web-syllabus@test.local",
+        full_name="Owner",
+        password_hash="hash",
+    )
+    db_session.add(owner)
+    db_session.flush()
+    doc = Document(
+        owner_id=owner.id,
+        title="Public course",
+        status="ready",
+        is_private=False,
+    )
+    db_session.add(doc)
+    db_session.flush()
+    db_session.add(DocumentPage(document_id=doc.id, page_number=1, text=""))
+    db_session.commit()
+    source = {
+        "title": "Course reference",
+        "url": "https://example.test/course",
+        "domain": "example.test",
+        "snippet": "A fetched course topic sentence.",
+    }
+    monkeypatch.setattr(
+        "app.services.web_search.search_web", lambda *_args: ([source], None)
+    )
+    response = client.post(
+        "/syllabi",
+        headers={"Authorization": f"Bearer {access_token_for(owner.id)}"},
+        json={"title": "Public course", "document_id": doc.id, "use_web_search": True},
+    )
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["sources"]["web"] == [source]
+    assert payload["web_items"][0]["url"] == source["url"]
+    assert payload["web_items"][0]["quote"] == source["snippet"]
+    saved = client.get(
+        f"/syllabi/{payload['id']}",
+        headers={"Authorization": f"Bearer {access_token_for(owner.id)}"},
+    )
+    assert saved.json()["sources"]["web"] == [source]

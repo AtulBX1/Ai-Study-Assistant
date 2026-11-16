@@ -636,7 +636,7 @@ def test_current_migration_is_the_single_head_and_upgrades_empty_database(
 
     try:
         assert ScriptDirectory.from_config(alembic_config).get_heads() == [
-            "15c_syllabus_mapping"
+            "16_web_sources"
         ]
         command.upgrade(alembic_config, "head")
         engine = create_engine(f"sqlite:///{database_path.as_posix()}")

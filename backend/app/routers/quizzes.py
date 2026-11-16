@@ -43,6 +43,7 @@ from app.services.rag.providers import (
     ProviderUnavailableError,
     RateLimitError,
 )
+from app.services.web_search import web_study_items
 
 router = APIRouter(prefix="/quizzes", tags=["quizzes"])
 AuthenticatedUser = Annotated[User, Depends(get_current_user)]
@@ -255,6 +256,24 @@ def create_quiz(
         )
     requested_by_type = _type_quotas(request)
     private_selected = any(doc_by_id[chunk.doc_id].is_private for chunk in chunks)
+    web_sources: list[dict[str, str]] = []
+    web_notice = None
+    if request.use_web_search:
+        if user.local_models_only:
+            web_notice = (
+                "Web search is unavailable in local-only mode; "
+                "continuing with your notes only."
+            )
+        elif private_selected:
+            web_notice = (
+                "Web search is unavailable for private documents; "
+                "continuing with your notes only."
+            )
+        else:
+            from app.services.web_search import search_web
+
+            topic_query = " ".join(request.topics) or request.title
+            web_sources, web_notice = search_web(topic_query)
     if request.chapter:
         pages = list(
             db.scalars(
@@ -575,6 +594,15 @@ def create_quiz(
         "fallback_reason": fallback_reason,
         "difficulty_mix": dict(Counter(q.difficulty.value for q in accepted)),
         "by_type": report_by_type,
+        "sources": {
+            "your_notes": [
+                {"document_title": doc.title, "document_id": doc.id}
+                for doc in documents
+            ],
+            "web": web_sources,
+        },
+        "web_items": web_study_items(web_sources),
+        **({"web_notice": web_notice} if web_notice else {}),
     }
     if not accepted:
         raise HTTPException(

@@ -423,6 +423,70 @@ def test_private_document_never_calls_external_provider(db_session):
     assert "Private document cannot be sent" in summary.fallback_reason
 
 
+def test_private_summary_opt_in_never_triggers_web_search(
+    client, db_session, monkeypatch
+):
+    owner = _user(db_session, "private-summary-web")
+    document = _document(db_session, owner, is_private=True)
+    db_session.add(
+        DocumentPage(
+            document_id=document.id,
+            page_number=1,
+            text="Private note about neural networks and gradient descent.",
+        )
+    )
+    db_session.commit()
+    calls = []
+    monkeypatch.setattr(
+        "app.services.web_search.search_web",
+        lambda *args, **kwargs: calls.append(args) or ([], None),
+    )
+    response = client.post(
+        f"/study/documents/{document.id}/summaries",
+        headers=_headers(owner),
+        json={"engine": "extractive", "use_web_search": True},
+    )
+    assert response.status_code == 201, response.text
+    assert calls == []
+    assert response.json()["sources"]["web"] == []
+
+
+def test_web_summary_items_store_source_url_and_matching_quote(
+    client, db_session, monkeypatch
+):
+    owner = _user(db_session, "public-summary-web")
+    document = _document(db_session, owner)
+    db_session.add(
+        DocumentPage(
+            document_id=document.id,
+            page_number=1,
+            text="A sufficiently clear note sentence about network routing protocols.",
+        )
+    )
+    db_session.commit()
+    source = {
+        "title": "Routing reference",
+        "url": "https://example.test/routing",
+        "domain": "example.test",
+        "snippet": "A fetched sentence about routing protocols.",
+    }
+    monkeypatch.setattr(
+        "app.services.web_search.search_web", lambda *_args: ([source], None)
+    )
+    response = client.post(
+        f"/study/documents/{document.id}/summaries",
+        headers=_headers(owner),
+        json={"engine": "extractive", "use_web_search": True},
+    )
+    assert response.status_code == 201, response.text
+    payload = response.json()
+    item = next(item for item in payload["items"] if item.get("source_type") == "web")
+    assert item["url"] == source["url"]
+    assert item["quote"] == source["snippet"]
+    assert item["text"].startswith("Based on web (not in your notes)")
+    assert payload["sources"]["web"] == [source]
+
+
 # ACCEPTANCE TEST 6
 def test_sections_headings_and_10_page_blocks_and_skip_outline(db_session):
     """6. Sections: headings used when present, otherwise 10-page blocks."""

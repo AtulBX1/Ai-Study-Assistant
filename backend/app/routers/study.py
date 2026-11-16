@@ -753,6 +753,7 @@ class SummaryRequest(BaseModel):
     page_end: int | None = Field(default=None, ge=1)
     regenerate: bool = False
     run_async: bool = False
+    use_web_search: bool = False
 
 
 def _summary_payload(summary: DocumentSummary) -> dict[str, Any]:
@@ -781,6 +782,8 @@ def _summary_payload(summary: DocumentSummary) -> dict[str, Any]:
                 "validation": "local grounding and evidence checks",
             },
         ),
+        "sources": metadata.get("sources", {"your_notes": [], "web": []}),
+        "web_notice": metadata.get("web_notice"),
         "created_at": summary.created_at,
         "updated_at": summary.updated_at,
     }
@@ -818,7 +821,7 @@ def create_summary(
         )
 
     # Cache lookup if not explicitly regenerating
-    if not request.regenerate:
+    if not request.regenerate and not request.use_web_search:
         query = (
             select(DocumentSummary)
             .where(
@@ -846,7 +849,7 @@ def create_summary(
         if existing:
             return _summary_payload(existing)
 
-    if request.run_async:
+    if request.run_async and not request.use_web_search:
         job_id = str(uuid4())
         job_queue.enqueue(
             "generate_summary",
@@ -877,6 +880,59 @@ def create_summary(
         page_end=request.page_end,
         provider=summary_provider,
     )
+    if request.use_web_search:
+        web_sources: list[dict[str, str]] = []
+        web_notice = None
+        if user.local_models_only:
+            web_notice = (
+                "Web search is unavailable in local-only mode; "
+                "continuing with your notes only."
+            )
+        elif document.is_private:
+            web_notice = (
+                "Web search is unavailable for private documents; "
+                "continuing with your notes only."
+            )
+        else:
+            from app.services.web_search import search_web
+
+            web_sources, web_notice = search_web(document.title)
+        summary_items = list(summary.items or [])
+        summary_items.extend(
+            {
+                "text": (
+                    f"Based on web (not in your notes): {source['snippet']} "
+                    f"[web: {source['domain']}]"
+                ),
+                "page_start": None,
+                "page_end": None,
+                "engine": "web",
+                "source_type": "web",
+                "url": source["url"],
+                "quote": source["snippet"],
+                "evidence_sentence": source["snippet"],
+            }
+            for source in web_sources
+        )
+        summary.items = summary_items
+        summary.content = "\n".join(
+            [summary.content]
+            + [
+                f"- Based on web (not in your notes): {item['snippet']} "
+                f"[web: {item['domain']}]"
+                for item in web_sources
+            ]
+        )
+        metadata = dict(summary.generation_metadata or {})
+        metadata["sources"] = {
+            "your_notes": [
+                {"page_start": summary.page_start, "page_end": summary.page_end}
+            ],
+            "web": web_sources,
+        }
+        if web_notice:
+            metadata["web_notice"] = web_notice
+        summary.generation_metadata = metadata
     db.commit()
     db.refresh(summary)
     return _summary_payload(summary)

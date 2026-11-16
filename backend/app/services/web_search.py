@@ -2,6 +2,7 @@
 
 from datetime import date
 from threading import Lock
+from typing import Any, Protocol
 from urllib.parse import urlparse
 
 import httpx
@@ -14,6 +15,25 @@ _count_day = date.today()
 _count = 0
 
 
+class SearchAdapter(Protocol):
+    """Slot for providers returning a title, URL and text snippet."""
+
+    def search(
+        self, query: str, api_key: str, timeout: float
+    ) -> list[dict[str, Any]]: ...
+
+
+class TavilyAdapter:
+    def search(self, query: str, api_key: str, timeout: float) -> list[dict[str, Any]]:
+        response = httpx.post(
+            "https://api.tavily.com/search",
+            json={"api_key": api_key, "query": query, "max_results": 5},
+            timeout=timeout,
+        )
+        response.raise_for_status()
+        return response.json().get("results", [])
+
+
 def topic_query(query: str) -> str:
     """Keep only a short question topic; never accept retrieved/document text here."""
     words = query.replace("\n", " ").split()
@@ -21,7 +41,7 @@ def topic_query(query: str) -> str:
 
 
 def search_web(
-    query: str, settings: Settings | None = None
+    query: str, settings: Settings | None = None, adapter: SearchAdapter | None = None
 ) -> tuple[list[dict[str, str]], str | None]:
     global _count, _count_day
     settings = settings or get_settings()
@@ -41,22 +61,14 @@ def search_web(
             )
         _count += 1
     try:
-        if settings.web_search_provider != "tavily":
+        if settings.web_search_provider != "tavily" and adapter is None:
             return (
                 [],
                 "Web search provider unavailable; continuing with your notes only.",
             )
-        response = httpx.post(
-            "https://api.tavily.com/search",
-            json={
-                "api_key": settings.web_search_api_key,
-                "query": topic,
-                "max_results": 5,
-            },
-            timeout=5.0,
+        rows = (adapter or TavilyAdapter()).search(
+            topic, settings.web_search_api_key, 5.0
         )
-        response.raise_for_status()
-        rows = response.json().get("results", [])
         results = []
         for row in rows[:5]:
             url = str(row.get("url", ""))
@@ -76,3 +88,36 @@ def search_web(
         return results, None
     except Exception:
         return [], "Web search failed; continuing with your notes only."
+
+
+def valid_web_evidence(item: dict[str, Any], sources: list[dict[str, str]]) -> bool:
+    """Require a returned URL and a verbatim quote from its fetched snippet."""
+    url, quote = item.get("url"), item.get("quote")
+    if not isinstance(url, str) or not isinstance(quote, str) or not quote.strip():
+        return False
+    return any(
+        source.get("url") == url and quote.strip() in source.get("snippet", "")
+        for source in sources
+    )
+
+
+def web_study_items(sources: list[dict[str, str]]) -> list[dict[str, str]]:
+    """Build safe supplemental items whose quote is copied from its cited result."""
+    items = []
+    for source in sources:
+        evidence = {"url": source.get("url"), "quote": source.get("snippet")}
+        if not valid_web_evidence(evidence, [source]):
+            continue
+        items.append(
+            {
+                "text": (
+                    "Based on web (not in your notes): "
+                    f"{source['snippet']} [web: {source['domain']}]"
+                ),
+                "url": source["url"],
+                "quote": source["snippet"],
+                "title": source["title"],
+                "domain": source["domain"],
+            }
+        )
+    return items
