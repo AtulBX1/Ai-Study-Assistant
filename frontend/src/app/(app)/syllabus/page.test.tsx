@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ listSyllabi: vi.fn(), listDocuments: vi.fn(), previewSyllabus: vi.fn(), getCoverage: vi.fn(), getSyllabus: vi.fn(), createSyllabus: vi.fn(), addTopic: vi.fn(), editTopic: vi.fn(), deleteTopic: vi.fn() }));
+const mocks = vi.hoisted(() => ({ listSyllabi: vi.fn(), listDocuments: vi.fn(), previewSyllabus: vi.fn(), getCoverage: vi.fn(), getSyllabus: vi.fn(), getImportantQuestions: vi.fn(), createSyllabus: vi.fn(), addTopic: vi.fn(), editTopic: vi.fn(), deleteTopic: vi.fn() }));
 vi.mock("@/lib/syllabus", () => mocks);
 vi.mock("@/lib/documents", () => ({ listDocuments: mocks.listDocuments }));
 import SyllabusPage from "./page";
@@ -13,12 +13,21 @@ describe("syllabus", () => {
   it("previews parsed topics and displays coverage with topic actions", async () => {
     render(<SyllabusPage />);
     expect(await screen.findByText("Coverage: 50%")).toBeTruthy();
-    expect(screen.getByText("no material found: upload notes covering this topic")).toBeTruthy();
+    expect(screen.getByText(/No notes for this topic/)).toBeTruthy();
     expect(screen.getAllByRole("link", { name: "Quiz this topic" })[0].getAttribute("href")).toContain("syllabusId=1&topicId=8");
     expect(screen.getAllByRole("link", { name: "Make flashcards" })[0].getAttribute("href")).toContain("documentId=4");
     fireEvent.change(screen.getByLabelText("Paste syllabus"), { target: { value: "1. Routing" } });
     fireEvent.click(screen.getByRole("button", { name: "Preview topics" }));
     expect(await screen.findByDisplayValue("Routing")).toBeTruthy();
     expect(mocks.previewSyllabus).toHaveBeenCalledWith("1. Routing");
+  });
+
+  it("shows a grounded question batch with note evidence", async () => {
+    mocks.getImportantQuestions.mockResolvedValue({ status: "grounded", items: [{ type: "short", question: "What is routing?", model_answer_outline: ["Routing forwards packets."], evidence_quote: "Routing forwards packets between networks.", label: "From your notes (p.2)", page: 2, difficulty: "easy", importance_rank: 1, importance_score: 4 }] });
+    render(<SyllabusPage />);
+    fireEvent.click(await screen.findAllByRole("button", { name: "Important questions" }).then((buttons) => buttons[0]));
+    expect(await screen.findByText(/What is routing\?/)).toBeTruthy();
+    expect(screen.getByText(/Routing forwards packets between networks/)).toBeTruthy();
+    expect(mocks.getImportantQuestions).toHaveBeenCalledWith(1, 8, false);
   });
 });

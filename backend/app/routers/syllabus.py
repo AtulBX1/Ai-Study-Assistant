@@ -24,6 +24,7 @@ from app.models import (
 )
 from app.services.embeddings import EmbeddingService, get_embedding_service
 from app.services.syllabus import coverage, parse_syllabus, remap_syllabus, save_tree
+from app.services.syllabus.questions import important_questions
 from app.services.web_search import web_study_items
 
 
@@ -76,6 +77,10 @@ class ManualMap(BaseModel):
     document_id: int
     page_start: int = Field(ge=1)
     page_end: int = Field(ge=1)
+
+
+class QuestionBatchRequest(BaseModel):
+    suggest_likely: bool = False
 
 
 def owned(db: Session, syllabus_id: int, owner_id: int) -> Syllabus:
@@ -350,6 +355,38 @@ def get_coverage(
 ) -> dict:
     owned(db, syllabus_id, user.id)
     return coverage(db, syllabus_id)
+
+
+@router.post("/{syllabus_id}/topics/{topic_id}/important-questions")
+def topic_important_questions(
+    syllabus_id: int,
+    topic_id: int,
+    request: QuestionBatchRequest,
+    db: DatabaseSession,
+    user: AuthenticatedUser,
+) -> dict:
+    item = owned(db, syllabus_id, user.id)
+    topic = db.scalar(
+        select(SyllabusTopic).where(
+            SyllabusTopic.id == topic_id, SyllabusTopic.syllabus_id == item.id
+        )
+    )
+    if topic is None:
+        raise HTTPException(404, "Topic not found.")
+    mapped = list(
+        db.execute(
+            select(ChunkTopic, Chunk)
+            .join(Chunk, ChunkTopic.chunk_id == Chunk.id)
+            .join(Document, Chunk.doc_id == Document.id)
+            .where(
+                ChunkTopic.topic_id == topic.id,
+                Document.owner_id == user.id,
+                Document.status == "ready",
+            )
+            .order_by(Chunk.id)
+        )
+    )
+    return important_questions(topic, mapped, suggest_likely=request.suggest_likely)
 
 
 @router.get("/{syllabus_id}/analytics")

@@ -243,6 +243,7 @@ export function StudyScreen({ documentId }: { documentId: number }) {
   const [sessionId, setSessionId] = useState<number | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
+  useEffect(() => { const query = new URLSearchParams(window.location.search).get("query"); if (query) setInput(query); }, []);
   const [mode, setMode] = useState<ChatOptions["mode"]>("normal");
   const [language, setLanguage] = useState<ChatOptions["language"]>("English");
   const [useWebSearch, setUseWebSearch] = useState(false);
