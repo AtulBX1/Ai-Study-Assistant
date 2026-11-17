@@ -66,7 +66,7 @@ export function FlashcardDecksPage({ prefillDocumentId, prefillTopic }: { prefil
       const selectedScope = scope[document.id] ?? "document";
       const range = pageRanges[document.id] ?? ["1", String(document.page_count ?? "")];
       const result = await generateFlashcards(document.id, {
-        count: Number(counts[document.id] || 20),
+        count: Number(counts[document.id] || 40),
         ...(selectedScope === "pages" ? { page_start: Number(range[0]), ...(range[1] ? { page_end: Number(range[1]) } : {}) } : {}),
         ...(selectedScope === "topic" && topics[document.id] ? { chapter: topics[document.id] } : {}),
       });
@@ -112,7 +112,7 @@ export function FlashcardDecksPage({ prefillDocumentId, prefillTopic }: { prefil
                 </div>
                 <div className="grid gap-2 sm:grid-cols-2">
                   <label className="text-sm">Generation scope <select aria-label={`Scope for ${document.title}`} className="ml-2 rounded border bg-background p-2" value={scope[document.id] ?? "document"} onChange={(e) => setScope((v) => ({ ...v, [document.id]: e.target.value as "document" | "pages" | "topic" }))}><option value="document">Document</option><option value="pages">Page range</option><option value="topic">Topic</option></select></label>
-                  <label className="text-sm">Count <input aria-label={`Card count for ${document.title}`} className="ml-2 w-20 rounded border bg-background p-2" type="number" min="1" max="40" value={counts[document.id] ?? "20"} onChange={(e) => setCounts((v) => ({ ...v, [document.id]: e.target.value }))} /></label>
+                  <label className="text-sm">Count <input aria-label={`Card count for ${document.title}`} className="ml-2 w-20 rounded border bg-background p-2" type="number" min="1" max="40" value={counts[document.id] ?? "40"} onChange={(e) => setCounts((v) => ({ ...v, [document.id]: e.target.value }))} /></label>
                   {scope[document.id] === "pages" && <div className="flex gap-2"><input aria-label="Page from" type="number" min="1" className="w-24 rounded border bg-background p-2" placeholder="From" value={(pageRanges[document.id] ?? ["1", ""])[0]} onChange={(e) => setPageRanges((v) => ({ ...v, [document.id]: [e.target.value, (v[document.id] ?? ["1", ""])[1]] }))} /><input aria-label="Page to" type="number" min="1" className="w-24 rounded border bg-background p-2" placeholder="To" value={(pageRanges[document.id] ?? ["1", ""])[1]} onChange={(e) => setPageRanges((v) => ({ ...v, [document.id]: [(v[document.id] ?? ["1", ""])[0], e.target.value] }))} /></div>}
                   {scope[document.id] === "topic" && <input aria-label="Flashcard topic" className="rounded border bg-background p-2" placeholder="Topic" value={topics[document.id] ?? ""} onChange={(e) => setTopics((v) => ({ ...v, [document.id]: e.target.value }))} />}
                 </div>
@@ -301,3 +301,4 @@ export function FlashcardReviewPage({ documentId }: { documentId?: number }) {
     </main>
   );
 }
+

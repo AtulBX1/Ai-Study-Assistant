@@ -236,11 +236,12 @@ def test_document_flashcards_generate_without_any_quiz_and_are_deduplicated(
     db_session.commit()
 
     path = f"/study/documents/{document.id}/flashcards/generate"
-    first = client.post(path, headers=_headers(owner), params={"count": 10})
-    second = client.post(path, headers=_headers(owner), params={"count": 10})
+    first = client.post(path, headers=_headers(owner))
+    second = client.post(path, headers=_headers(owner))
 
     assert first.status_code == 201, first.text
     assert first.json()["created"] == 2
+    assert first.json()["requested"] == 40
     assert first.json()["created_by_source"] == {
         "glossary": 1,
         "cloze": 1,
@@ -252,6 +253,20 @@ def test_document_flashcards_generate_without_any_quiz_and_are_deduplicated(
         "glossary",
         "cloze",
     }
+    listed = client.get(
+        "/study/flashcards/due",
+        headers=_headers(owner),
+        params={"document_id": document.id},
+    )
+    assert listed.status_code == 200
+    assert len(listed.json()) == 2
+    reviewed = client.post(
+        f"/study/flashcards/{listed.json()[0]['id']}/review",
+        headers=_headers(owner),
+        json={"rating": "Good"},
+    )
+    assert reviewed.status_code == 200
+    assert reviewed.json()["rating"] == "Good"
     assert second.status_code == 201
     assert second.json()["created"] == 0
     assert db_session.query(Quiz).filter_by(source_document_id=document.id).count() == 0

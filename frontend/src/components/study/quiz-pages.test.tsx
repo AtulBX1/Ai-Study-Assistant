@@ -143,6 +143,26 @@ describe("quiz screens", () => {
     expect(mocks.createQuiz.mock.calls[0][0]).toMatchObject({ question_types: ["multiple_choice", "fill_in_the_blank", "short_answer"] });
   });
 
+  it("sends all four enabled types when AI is selected for a public document", async () => {
+    mocks.listDocuments.mockResolvedValue([{ id: 4, title: "Public.pdf", status: "ready", is_private: false, page_count: 7 }]);
+    mocks.createQuiz.mockResolvedValue({ id: 3, title: "Unit II review", engine: "ai", questionCount: 4, report: {} });
+    render(<QuizBuilderPage />);
+    for (const label of ["Multiple choice", "True / false", "Fill in the blank", "Short answer"]) {
+      const checkbox = await screen.findByRole("checkbox", { name: label }) as HTMLInputElement;
+      expect(checkbox.disabled).toBe(false);
+      expect(checkbox.checked).toBe(true);
+    }
+    const ai = await screen.findByRole("radio", { name: "AI provider" }) as HTMLInputElement;
+    expect(ai.disabled).toBe(false);
+    fireEvent.click(ai);
+    fireEvent.click(screen.getByRole("button", { name: "Generate quiz" }));
+    await waitFor(() => expect(mocks.createQuiz).toHaveBeenCalled());
+    expect(mocks.createQuiz.mock.calls[0][0]).toMatchObject({
+      question_types: ["multiple_choice", "true_false", "fill_in_the_blank", "short_answer"],
+      engine: "ai",
+    });
+  });
+
   it("shows partial-result transparency and per-question engine counts", async () => {
     mocks.listDocuments.mockResolvedValue([{
       id: 4,

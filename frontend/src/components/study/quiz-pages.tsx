@@ -53,9 +53,19 @@ function rejectReasonLabel(value: string): string {
   const known: Record<string, string> = {
     insufficient_valid_questions: "not enough valid questions could be produced",
     provider_unavailable: "AI provider unavailable",
+    ai_provider_unavailable: "AI provider unavailable",
+    ai_generation_failed: "AI provider could not generate a valid question",
+    ai_invalid_response: "AI response had an invalid format",
+    ai_rate_limited: "AI provider is busy",
     rate_limited: "AI provider busy",
     invalid_question: "question format was invalid",
     evidence_mismatch: "question did not match source evidence",
+    evidence_missing: "question did not include source evidence",
+    evidence_not_in_source: "evidence did not match the document",
+    answer_not_noun_phrase: "answer must be a concise term or phrase",
+    answer_not_in_source: "answer was not found in the document",
+    symbol_clutter: "question contained emoji or symbols",
+    quiz_true_false_balance: "true/false answers could not be balanced",
     duplicate: "question repeated another candidate",
   };
   return known[value] ?? value.replaceAll("_", " ");

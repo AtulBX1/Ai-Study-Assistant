@@ -1,5 +1,7 @@
 """Fake-only quiz API routing, quotas, and owner-isolation tests."""
 
+from types import SimpleNamespace
+
 from app.models import Chunk, Document, Question, Quiz, User
 from app.routers import quizzes
 from app.services.quiz.schemas import QuizQuestion
@@ -266,6 +268,128 @@ def test_offline_quiz_reports_round_robin_type_quotas(client, db_session, monkey
     assert report["by_type"]["fill_in_the_blank"]["requested"] == 1
     assert report["by_type"]["fill_in_the_blank"]["produced"] == 1
     assert response.json()["questions"] == 3
+
+
+def test_all_question_types_survive_offline_and_fake_ai_api_batches(
+    client, db_session, monkeypatch
+):
+    user = _user(db_session, "all-types@example.test")
+    document = Document(owner_id=user.id, title="Types", status="ready")
+    db_session.add(document)
+    db_session.flush()
+    sentences = [
+        "The Python language supports indentation for clear code blocks.",
+        "Java compiles source files into portable bytecode for applications.",
+        "Ruby provides concise syntax for dynamic web applications.",
+        "Kotlin supports interoperable development on the JVM platform.",
+    ]
+    chunk = Chunk(
+        doc_id=document.id,
+        page=1,
+        page_start=1,
+        page_end=1,
+        text=" ".join(sentences),
+        token_count=40,
+        chunk_index=0,
+    )
+    db_session.add(chunk)
+    db_session.commit()
+    candidates = {
+        "multiple_choice": QuizQuestion(
+            question="Which language supports indentation for clear code blocks?",
+            type="multiple_choice",
+            options=["Python language", "Java", "Ruby", "Kotlin"],
+            correct_answer="Python language",
+            evidence=sentences[0],
+            explanation=sentences[0],
+            source_chunk_id=chunk.id,
+            page=1,
+            difficulty="medium",
+            engine="offline",
+        ),
+        "true_false": QuizQuestion(
+            question=(
+                "True or false: The Python language supports indentation "
+                "for clear code blocks."
+            ),
+            type="true_false",
+            options=["True", "False"],
+            correct_answer="True",
+            evidence=sentences[0],
+            explanation=sentences[0],
+            source_chunk_id=chunk.id,
+            page=1,
+            difficulty="medium",
+            engine="offline",
+        ),
+        "fill_in_the_blank": QuizQuestion(
+            question=(
+                "Fill in the blank: _____ provides concise syntax for "
+                "dynamic web applications."
+            ),
+            type="fill_in_the_blank",
+            correct_answer="Ruby",
+            evidence=sentences[2],
+            explanation=sentences[2],
+            source_chunk_id=chunk.id,
+            page=1,
+            difficulty="medium",
+            engine="offline",
+        ),
+        "short_answer": QuizQuestion(
+            question="Which language compiles source files into portable bytecode?",
+            type="short_answer",
+            correct_answer="Java",
+            evidence=sentences[1],
+            explanation=sentences[1],
+            source_chunk_id=chunk.id,
+            page=1,
+            difficulty="medium",
+            engine="offline",
+        ),
+    }
+    monkeypatch.setattr(quizzes, "embedding_similarity", lambda *_args: 0.0)
+    monkeypatch.setattr("app.nlp.preprocessing._spacy_model", lambda: None)
+
+    class FakeEngine:
+        qa_model = staticmethod(
+            lambda question, _source: (
+                "Python language" if "indentation" in question else "Java"
+            )
+        )
+
+        def __init__(self, provider=None):
+            self.provider = provider
+
+        def generate(self, _chunk, *, type_cycle, **_kwargs):
+            return [candidates[kind].model_copy(deep=True) for kind in type_cycle]
+
+    monkeypatch.setattr(quizzes, "ClassicEngine", FakeEngine)
+    monkeypatch.setattr(quizzes, "LLMEngine", FakeEngine)
+    monkeypatch.setattr(
+        quizzes, "_provider", lambda: SimpleNamespace(name="fake-provider")
+    )
+    for engine in ("offline", "ai"):
+        response = client.post(
+            "/quizzes",
+            headers=_headers(user),
+            json={
+                "document_ids": [document.id],
+                "engine": engine,
+                "count": 4,
+                "question_types": list(candidates),
+            },
+        )
+        assert response.status_code == 201, response.text
+        report = response.json()["report"]["by_type"]
+        assert set(report) == set(candidates)
+        assert all(row["requested"] == row["produced"] == 1 for row in report.values())
+        assert all(row["reject_reasons"] == {} for row in report.values())
+        detail = client.get(f"/quizzes/{response.json()['id']}", headers=_headers(user))
+        assert detail.status_code == 200
+        assert {question["type"] for question in detail.json()["questions"]} == set(
+            candidates
+        )
 
 
 def test_auto_uses_ai_then_offline_for_shortfall(client, db_session, monkeypatch):

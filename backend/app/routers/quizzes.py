@@ -34,6 +34,7 @@ from app.services.quiz.generation import (
     StructuredOutputError,
     balance_true_false_questions,
     clean_chunk_text,
+    clean_question_stem,
 )
 from app.services.quiz.grading import grade_answer, weak_question_ids
 from app.services.quiz.schemas import GenerationRequest, QuizQuestion
@@ -534,6 +535,7 @@ def create_quiz(
                 reject("difficulty_mismatch", kind)
                 continue
             candidate.engine = engine_label
+            candidate.question = clean_question_stem(candidate.question)
             try:
                 ok, reason = validate_generated(
                     candidate,

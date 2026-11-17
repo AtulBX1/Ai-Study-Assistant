@@ -176,6 +176,7 @@ def normalize_question_item(item: Any) -> dict[str, Any]:
     question = re.sub(
         r"^(?:short\s+answer|question)\s*:\s*", "", str(question or ""), flags=re.I
     )
+    question = clean_question_stem(question)
     raw_type = (
         str(
             next(
@@ -454,6 +455,24 @@ def clean_chunk_text(text: str) -> str:
     return " ".join(cleaned_lines)
 
 
+def clean_question_stem(value: str) -> str:
+    """Remove question clutter while preserving common language names."""
+    value = re.sub(r"(?<!\w)C\+\+(?!\w)", "CPPLANGUAGE", value, flags=re.I)
+    value = re.sub(r"(?<!\w)(C|F)#(?!\w)", r"\1SHARPLANGUAGE", value, flags=re.I)
+    value = "".join(
+        (
+            " "
+            if unicodedata.category(character).startswith("S")
+            or character in {"\u200d", "\ufe0f", "•", "●", "▪", "◦", "◆", "◇", "■", "□"}
+            else character
+        )
+        for character in value
+    )
+    value = re.sub(r"\s+", " ", value).strip()
+    value = re.sub(r"\bCPPLANGUAGE\b", "C++", value, flags=re.I)
+    return re.sub(r"\b(C|F)SHARPLANGUAGE\b", r"\1#", value, flags=re.I)
+
+
 def complete_source_sentences(text: str) -> list[str]:
     """Return complete, sentence-like source units suitable for one-question prompts."""
     result = []
@@ -609,7 +628,7 @@ def balance_true_false_questions(
         if item.type.value == "true_false" and item.correct_answer.casefold() == "false"
     ]
     if not true_items or not false_items:
-        return [item for item in questions if item.type.value != "true_false"]
+        return list(questions)
     keep_true, keep_false = len(true_items), len(false_items)
     if keep_true > 7 * keep_false / 3:
         keep_true = (7 * keep_false) // 3

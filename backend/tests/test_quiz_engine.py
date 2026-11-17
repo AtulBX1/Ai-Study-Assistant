@@ -15,6 +15,7 @@ from app.services.quiz.generation import (
     balance_true_false_questions,
     build_false_statement,
     clean_chunk_text,
+    clean_question_stem,
     complete_source_sentences,
     extract_candidates,
     extract_json_value,
@@ -169,6 +170,21 @@ def test_cleaning_strips_symbols_and_validation_rejects_bad_answers():
         emoji_question.evidence,
         qa_model=lambda *_: "Python Software Foundation",
     ) == (False, "symbol_clutter")
+    cleaned_stem = clean_question_stem(
+        "⚠️ Which language uses C++ for these examples? ➜"
+    )
+    assert "⚠" not in cleaned_stem and "➜" not in cleaned_stem
+    assert "C++" in cleaned_stem
+
+
+def test_true_false_single_value_batch_is_not_discarded():
+    item = _question(
+        question="True or false: The Python language developed at the foundation.",
+        type="true_false",
+        options=["True", "False"],
+        correct_answer="True",
+    )
+    assert balance_true_false_questions([item]) == [item]
 
 
 def test_offline_multiple_choice_uses_distinct_same_type_distractors():
@@ -373,7 +389,7 @@ def test_false_statements_swap_readable_same_type_terms_and_honor_quota():
     assert len(questions) == 1
 
 
-def test_lone_true_statement_is_engine_candidate_but_assembly_enforces_balance():
+def test_lone_true_false_statement_survives_quiz_assembly():
     source = "Cats are mammals that often live with people inside family homes."
     engine = ClassicEngine(
         entity_extractor=lambda _: [{"text": "Cats", "label": "ANIMAL"}]
@@ -383,7 +399,7 @@ def test_lone_true_statement_is_engine_candidate_but_assembly_enforces_balance()
     candidates = engine.generate(chunk, type_cycle=("true_false",), question_quota=1)
 
     assert [item.correct_answer for item in candidates] == ["True"]
-    assert balance_true_false_questions(candidates) == []
+    assert balance_true_false_questions(candidates) == candidates
 
 
 def test_quiz_assembly_balances_true_false_without_rejecting_true_candidates():
@@ -412,8 +428,8 @@ def test_quiz_assembly_balances_true_false_without_rejecting_true_candidates():
     balanced = balance_true_false_questions(true_questions + false_questions)
     true_count = sum(item.correct_answer == "True" for item in balanced)
     assert 30 <= 100 * true_count / len(balanced) <= 70
-    assert balance_true_false_questions(true_questions) == []
-    assert balance_true_false_questions(false_questions) == []
+    assert balance_true_false_questions(true_questions) == true_questions
+    assert balance_true_false_questions(false_questions) == false_questions
 
 
 def test_classic_text_cleaning_and_sentence_filtering():
